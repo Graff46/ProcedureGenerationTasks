@@ -1,0 +1,35 @@
+--dtask_actions
+local sim = alife()
+
+function rtrue()
+	printf("~ACT2") 
+	return true
+end
+
+function complete(dqobj)
+	dqobj:progress('complete')
+	return true
+end
+
+function take_obj(dqobj)
+printf("~ACT") 
+	local sobj, npc = sim:object(dqobj.current_target), dqobj.executor
+
+	local rucObj = sim:create(sobj:section_name(), vector(), 1, 1, npc:id() )
+	
+	level.client_spawn_manager():add(rucObj.id, 0,
+	    function(id, obj)
+			npc:transfer_item(obj, npc)
+	    end )
+	sim:release(sobj, true)
+
+	return true
+end 
+
+function def_conder(_, lgk)
+	return lgk.st.purpose.position:distance_to_sqr(lgk.object:position()) < 2
+end
+
+function myconder(_, lgk)
+	return lgk.st.purpose.position:distance_to_sqr(lgk.object:position()) < 9
+end

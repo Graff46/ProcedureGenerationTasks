@@ -1,0 +1,169 @@
+local sim = alife()
+
+
+local lastValue = ""
+function targetSetHndlr(value, qtobj)	
+	local hndlr, conder = 'rtrue', 'def_conder'
+	lastValue = value
+	
+	if string.find(value, "|") then 
+		value, hndlr = string.match(value, "(.+)[|](.+)")
+		
+		if string.find(value, "|") then
+			value, conder = string.match(value, "(.+)[|](.+)")
+		end
+	end
+	 
+	qtobj.curr_action =  _G["dtask_actions"][hndlr]
+	qtobj.conder = _G["dtask_actions"][conder]
+	
+	return get_story_object_id(value) 
+end
+
+function target_parser(qtobj)
+	--local parsed_condlist = xr_logic.parse_condlist(nil, "task", "task_condlist", dqobj.target)
+	local value = xr_logic.pick_section_from_condlist(db.actor, qtobj.executor, qtobj.target)
+	if lastValue == value then return qtobj.current_target end
+	
+	return targetSetHndlr(value, qtobj)
+end
+
+
+class "dynQuest" 
+
+--[[
+	type_work:
+	0 - Забрать предмет.
+	1 - Ликвидация.
+	2 - Приблизится (имитация взаимодействия).
+	3 - Сопровождение.
+]]
+
+function dynQuest:__init(id, executor, s_targetID, employerID)
+	local task_ini 		= task_manager.task_ini
+	
+	self.target				= task_ini:r_string_ex(id,"target")
+	self.target				= xr_logic.parse_condlist(nil, "task", "task_condlist", self.target)
+	self.type_work		= ttype
+	self.executor			= executor -- Исполнитель -и
+	self.employer		= employerID -- работодатель
+	self.keeper			= self.employer  -- храниль -и
+	self.last_target		= self.current_target
+		
+	self.mystate			= 1
+	self.switcher			= false
+		
+	self.curr_action		= dtask_actions.rtrue  
+	self.conder				= dtask_actions.def_conder  
+	
+	self.current_target	= this.target_parser(self)
+	
+	
+	--self.on_init = xr_logic.parse_condlist(self.executor, "dynqst.dynQuest", "self.on_init",  task_ini:r_string_ex(id,"on_init") or "") 
+	--self.on_complete = xr_logic.parse_condlist(self.executor, "dynqst.dynQuest", "self.on_complete", task_ini:r_string_ex(id,"on_complete") or "")
+	--self.on_fail = xr_logic.parse_condlist(self.executor, "dynqst.dynQuest", "self.on_fail", task_ini:r_string_ex(id,"on_fail") or "")
+	
+	local i = 0
+	self.condlist = {}
+	while task_ini:line_exist(id, "condlist_"..tostring(i)) do
+		table.insert(self.condlist,
+			xr_logic.parse_condlist(self.executor, "dynqst.dynQuest", "self.condlist", task_ini:r_string_ex(id, "condlist_"..tostring(i)))
+		)
+		i = i + 1
+	end
+	printf('!condlist|%s', tostring(#self.condlist))
+	return self
+end
+
+function dynQuest:set_behavior(targetID) 
+	self.switcher = this.dyn_quest(self.executor, sim:object(targetID), self)
+end
+
+function dynQuest:change_target (id)
+	self.current_target = id
+	self.switcher(self.current_target)
+end
+
+function dynQuest:step(logic)
+	printf("~STEP|"..tostring(self.mystate))
+	
+	if self.mystate > 1 then 
+		if self:curr_action() then 
+			self.mystate = self.mystate + 1
+		end 
+	else
+		self.switcher(self.current_target) 
+		self.mystate = self.mystate + 1
+	end
+end
+
+function dynQuest:progress(act)
+	--log1 ('progress|'..tostring(act))
+	if not act then return end
+		
+	if act == "complete" then	
+		log1 "~complete"
+		self.switcher(_, true)
+	elseif act == "fail" then 
+		self.switcher(_, true)
+	elseif act == "reversed" then
+		self.switcher(_, true)
+	end
+end
+-- updDynQuest
+-- dyn_qsts
+function dynQuest.update(bind, self) 	
+	if not self then return abort("dynqst:70") end
+
+	local t_target = this.target_parser(self)
+	if not t_target then
+		return abort("DynQst: new target parsing as nil!") 
+	end
+	
+	if self.current_target ~= t_target then
+		self.current_target = t_target
+		self.switcher(self.current_target) 
+	end
+
+	for i=1, #self.condlist do
+		self:progress( xr_logic.pick_section_from_condlist(db.actor, self.executor, self.condlist[i]) )
+	end
+end
+
+function dynQuest:set_state()
+	db.storage[self.executor:id()].curr_qsts = self 
+	self:set_behavior(self.employer )
+	
+	local bind = self.executor:binded_object()
+	bind.updDynQuest = self.update
+	
+	--xr_logic.pick_section_from_condlist(db.actor, self.executor, self.on_init)
+end
+
+function dyn_quest(npc, sobj, thisClass) 
+	local npc_id = npc:id()
+
+	if db.storage[npc_id].active_scheme then
+		xr_logic.issue_event(npc, db.storage[npc:id()][db.storage[npc:id()].active_scheme], "deactivate", npc)
+	end
+	
+	if db.storage[npc_id].overrides then
+		db.storage[npc_id].overrides = nil
+	end
+
+	local scheme, section, filename = "pointer", "pointer", 'xr_mytest'
+		log1 '!WORK1'
+	db.storage[npc_id].overrides = nil
+	--reset_generic_schemes_on_scheme_switch(npc, nil, nil)
+		log1 '!WORK2'
+	db.storage[npc_id].activation_time = time_global()
+	db.storage[npc_id].activation_game_time = game.get_game_time()
+	local a = _G[filename].set_scheme(npc, sobj, thisClass)
+
+	db.storage[npc_id].active_section = section
+	db.storage[npc_id].active_scheme = scheme
+	
+	xr_logic.issue_event(npc, db.storage[npc_id][scheme], "activate_scheme", false, npc)
+	return a
+end
+
