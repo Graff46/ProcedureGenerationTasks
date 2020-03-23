@@ -59,7 +59,7 @@ function arrived_to_smart(se_obj, smart)
 end
 
 ----------------------------------------------------------------------------------------------------------------------
--- ГЉГ«Г Г±Г± "se_smart_terrain". ГЋГЎГҐГ±ГЇГҐГ·ГЁГўГ ГҐГІ ГЇГ®Г¤Г¤ГҐГ°Г¦ГЄГі smart terrain Гў ГЋГ”Г‹ГЂГ‰ГЌГ….
+-- Класс "se_smart_terrain". Обеспечивает поддержку smart terrain в ОФЛАЙНЕ.
 ----------------------------------------------------------------------------------------------------------------------
 class "se_smart_terrain" (cse_alife_smart_zone)
 function se_smart_terrain:__init(section) super(section)
@@ -888,7 +888,7 @@ function se_smart_terrain:load_state(m_data)
 end
 --]]
 --*******************************************************
--- Г‘Г…Г‰Г‚/Г‹ГЋГЂГ„
+-- СЕЙВ/ЛОАД
 --*******************************************************
 function se_smart_terrain:STATE_Write(packet)
 	cse_alife_smart_zone.STATE_Write(self, packet)
@@ -897,7 +897,7 @@ function se_smart_terrain:STATE_Write(packet)
 	--end
 	--set_save_marker(packet, "save", false, "se_smart_terrain")
 
-	-- Г€Г­ГґГ®Г°Г¬Г Г¶ГЁГѕ Г® ГЌГЏГ‘, ГЁГ¤ГіГ№ГЁГµ Гў Г±Г¬Г Г°ГІ
+	-- Информацию о НПС, идущих в смарт
 	local n = 0
 	for k,v in pairs(self.arriving_npc) do
 		n = n + 1
@@ -909,7 +909,7 @@ function se_smart_terrain:STATE_Write(packet)
 	end
 
 
-	-- Г€Г­ГґГ®Г°Г¬Г Г¶ГЁГѕ Г® ГЌГЏГ‘ Гў Г±Г¬Г Г°ГІГҐ
+	-- Информацию о НПС в смарте
 	n = 0
 	for k,v in pairs(self.npc_info) do
 		n = n + 1
@@ -965,7 +965,7 @@ function se_smart_terrain:STATE_Read(packet, size)
 	--	self:load_state(alife_storage_manager.get_state())
 	--	return
 	--end
-	-- ГЇГ®Г¤ LevelEditor Г­ГҐ ГЇГ»ГІГ ГІГјГ±Гї Г·ГЁГІГ ГІГј ГЁГ§ ГЇГ ГЄГҐГІГ  Г­ГЁГ·ГҐГЈГ®
+	-- под LevelEditor не пытаться читать из пакета ничего
 	if editor() then
 		return
 	end
@@ -973,7 +973,7 @@ function se_smart_terrain:STATE_Read(packet, size)
 	self.need_init_npc = true
 	--set_save_marker(packet, "load", false, "se_smart_terrain")
 
-	-- Г€Г­ГґГ®Г°Г¬Г Г¶ГЁГѕ Г® ГЌГЏГ‘, ГЁГ¤ГіГ№ГЁГµ Гў Г±Г¬Г Г°ГІ
+	-- Информацию о НПС, идущих в смарт
 	local n = packet:r_u8()
 	self.arriving_npc = {}
 	for i = 1,n do
@@ -1140,7 +1140,7 @@ function se_smart_terrain:get_smart_props()
 			props = props.."\\nTime_to_spawn:"..tostring(self.respawn_idle - game.get_game_time():diffSec(self.last_respawn_update)).."\\n"
 		end
 			
-		--' Г„Г®ГЎГ ГўГ«ГїГҐГ¬ ГЁГ­ГґГ®Г°Г¬Г Г¶ГЁГѕ Г® Г­Г ГµГ®Г¤ГїГ№ГЁГµГ±Гї Гў Г±Г¬Г Г°ГІГҐ Г®ГІГ°ГїГ¤Г Гµ
+		--' Добавляем информацию о находящихся в смарте отрядах
 		for k,v in pairs(SIMBOARD.smarts[self.id].squads) do
 			props = props .. tostring(v.id) .. "\\n"
 		end
