@@ -1,0 +1,209 @@
+local var
+function start()
+	if not level.present() or (db.actor == nil) or not db.actor:alive() then
+		return
+	end
+	get_console():execute("main_menu off")
+	var = posinf46.PosInf46UI()
+	var:ShowDialog()
+end
+
+local function vec3Str(v)
+	return string.format('%f, %f, %f', v.x, v.y, v.z)
+end
+
+local function vec3Str2(v)
+	return string.format('%.4f, %.4f, %.4f', v.x, v.y, v.z)
+end
+
+class "PosInf46UI" (CUIScriptWnd)
+
+function PosInf46UI:__init() super()
+	self:InitControls()
+	self:InitCallBacks()
+	self.msg_box = 0
+end
+
+function PosInf46UI:__finalize()
+end
+
+function PosInf46UI:InitControls()
+	local xml = CScriptXmlInit()
+	self:SetWndRect					(Frect():set(0,0,1024,768))
+	xml:ParseFile("posinf46ui.xml")
+	self.frame = xml:InitFrame("frame", self)
+	self.header = xml:InitStatic("frame:header", self)
+	self.ch_campos = xml:InitCheck("frame:campos", self.frame)
+	self:Register(self.ch_campos, "campos")
+	self:Register(xml:Init3tButton("frame:btn_pos_scrpt", self.frame), "btn_pos_scrpt")
+	self:Register(xml:Init3tButton("frame:btn_pos_tbl", self.frame), "btn_pos_tbl")
+	self:Register(xml:Init3tButton("frame:btn_path_scr", self.frame), "btn_path_scr")
+	self.Static_point = xml:InitStatic("frame:Static_point", self.frame)
+	self:Register(xml:Init3tButton("frame:btn_path_allspw", self.frame), "btn_path_allspw")
+	self.frame_list = xml:InitFrame("frame:frame_list", self.frame)
+	self.listing = xml:InitTextWnd("frame:frame_list:listing", self.frame_list)
+	self:Register(xml:Init3tButton("frame:btn_tofile", self.frame), "btn_tofile")
+	self:Register(xml:Init3tButton("frame:btn_clrfile", self.frame), "btn_clrfile")
+	self.path_prfx = xml:InitEditBox("frame:path_prfx", self.frame)
+	self.path_name = xml:InitEditBox("frame:path_name", self.frame)
+	self:Register(xml:Init3tButton("frame:btn_crt_path", self.frame), "btn_crt_path")
+	
+	self.message_box = CUIMessageBoxEx()
+    self:Register(self.message_box, "msg_box")
+end
+
+function PosInf46UI:InitCallBacks()
+	self:AddCallback("msg_box", ui_events.MESSAGE_BOX_OK_CLICKED, self.OnMsgOk, self)
+
+	self:AddCallback("campos", ui_events.BUTTON_CLICKED, self.campos_button_clicked, self)
+	self:AddCallback("btn_pos_scrpt", ui_events.BUTTON_CLICKED, self.btn_pos_scrpt_button_clicked, self)
+	self:AddCallback("btn_pos_tbl", ui_events.BUTTON_CLICKED, self.btn_pos_tbl_button_clicked, self)
+	self:AddCallback("btn_path_scr", ui_events.BUTTON_CLICKED, self.btn_path_scr_button_clicked, self)
+	self:AddCallback("btn_path_allspw", ui_events.BUTTON_CLICKED, self.btn_path_allspw_button_clicked, self)
+	self:AddCallback("btn_tofile", ui_events.BUTTON_CLICKED, self.btn_tofile_button_clicked, self)
+	self:AddCallback("btn_crt_path", ui_events.BUTTON_CLICKED, self.btn_crt_path_button_clicked, self)
+	self:AddCallback("btn_clrfile", ui_events.BUTTON_CLICKED, self.btn_clear_file, self)
+	
+	self.listing:SetText(posex_mng.rdFile() )
+	get_console():execute(type(self.listing))
+	self:Calc()
+end
+
+function PosInf46UI:Calc()    
+	self.pos    = db.actor:position()
+	self.dir    = db.actor:direction()
+	self.campos = device().cam_pos
+	self.camdir = device().cam_dir
+	self.lv     = db.actor:level_vertex_id()
+	self.gv     = db.actor:game_vertex_id()
+	self.cpos   = self.pos
+	self.cdir   = self.dir
+	
+	if self.ch_campos:GetCheck() then
+		self.cpos = self.campos 
+		self.cdir = self.camdir
+	end
+	
+	local tbl = posex_mng.get_data()
+	if tbl and tbl.name then
+		self.path_prfx:SetText(tbl.name)
+	end
+end
+
+
+function PosInf46UI:listing_SetText(txt)    
+	self.listing:SetText(txt or "")
+end
+
+function PosInf46UI:listing_GetText(txt)    
+	return self.listing:GetText()
+end
+
+function PosInf46UI:campos_GetCheck()    --/true/false - включен/отключен campos
+	return self.ch_campos:GetCheck()
+end
+
+function PosInf46UI:campos_button_clicked()
+	--self:listing_SetText("")  
+	self:Calc()
+end
+
+function PosInf46UI:btn_pos_scrpt_button_clicked()
+	local str = string.format("[%s]\\nalife():create('stalker', vector():set(%s), %u, %u)\\ndir: %s\\n\\n", self.path_name:GetText() or "my_point", vec3Str(self.cpos), self.lv, self.gv, vec3Str(self.cdir))
+	self:listing_SetText(str)  
+end
+
+function PosInf46UI:btn_pos_tbl_button_clicked()
+	local str = string.format('[%s]\\nmodel_pos: %s,\\ncam_pos: %s\\nlevel_vertex: %u\\ngame_vertex: %u\\nmodel_dir: %s\\ncam_dir: %s\\ndir_angle: %.4f\\n\\n', self.path_name:GetText() or "my_point", vec3Str(self.pos), vec3Str(self.campos), self.lv, self.gv, vec3Str(self.dir), vec3Str(self.camdir), self.camdir:getH())
+	self:listing_SetText(str)  
+end
+
+function PosInf46UI:btn_path_scr_button_clicked()
+	local tbl = posex_mng.get_data()
+	if not tbl or table.getn(tbl) < 1 or not tbl.name then
+		self.msg_box = 1
+		self.message_box:Init ("message_box_posex_no_path")
+		self:GetHolder():start_stop_menu(self.message_box, false)
+		return 0
+	end
+	
+	local gstr = string.format('%s = {\\n' ,tbl.name)
+	local substr, str = "", ""
+	for i=1, table.getn(tbl) do
+		if tbl[i].look then
+			str = string.format('	{%u, 0, "wait", {%s}, %u},', tbl[i][1], vec3Str2(tbl[i].look), tbl[i][2])
+		else
+			str = string.format('	{%u, 0, "wait", nil, %u},', tbl[i][1], tbl[i][2])
+		end
+		substr = string.format('%s%s\\n', substr, str)
+	end
+	substr = string.match(substr, "(.+)[,]").."\\n"
+	gstr = string.format('%s%s}\\n\\n', gstr, substr)
+	self:listing_SetText(gstr)  
+end
+
+function PosInf46UI:btn_path_allspw_button_clicked()
+	local tbl = posex_mng.get_data()
+	if not tbl or table.getn(tbl) < 1 or not tbl.name then
+		self.msg_box = 1
+		self.message_box:Init ("message_box_posex_no_path")
+		self:GetHolder():start_stop_menu(self.message_box, false)
+		return 0
+	end
+	
+	local str_pnts = ""
+	local gstr = string.format('[%s]\\n', tbl.name)
+	for i=1, table.getn(tbl) do
+		str_pnts = string.format('%sp%u,', str_pnts, i-1)
+	end
+	str_pnts = string.match(str_pnts, "(.+)[,]")
+	
+	for i=1, table.getn(tbl) do
+		if i==1 then
+			gstr = string.format('%spoints = %s\\np%u:name = wp%u|\\np%u:position = %s\\np%u:game_vertex_id = %u\\np%u:level_vertex_id = %u\\np%u:links = p%u(1)\\n \\n', gstr, str_pnts or "", i-1, i-1, i-1, vec3Str(tbl[i][3]), i-1, tbl[i][2], i-1, tbl[i][1], i-1, i)
+		elseif i==table.getn(tbl) then
+			gstr = string.format('%sp%u:name = wp%u|\\np%u:position = %s\\np%u:game_vertex_id = %u\\np%u:level_vertex_id = %u\\n \\n \\n \\n', gstr, i-1, i-1, i-1, vec3Str(tbl[i][3]), i-1, tbl[i][2], i-1, tbl[i][1])
+		else
+			gstr = string.format('%sp%u:name = wp%u|\\np%u:position = %s\\np%u:game_vertex_id = %u\\np%u:level_vertex_id = %u\\n \\n', gstr, i-1, i-1, i-1, vec3Str(tbl[i][3]), i-1, tbl[i][2], i-1, tbl[i][1])
+		end
+	end
+	self:listing_SetText(gstr)  
+end
+
+function PosInf46UI:OnMsgOk()
+	
+end
+
+function PosInf46UI:btn_clear_file()
+	posex_mng.clear_file()
+	self.listing:SetText("")
+end
+
+function PosInf46UI:btn_tofile_button_clicked()
+	posex_mng.logfile(string.gsub(self.listing:GetText(), "\\n", "\n") )
+end
+
+function PosInf46UI:btn_crt_path_button_clicked()
+	posex_mng.clear_tbl()
+	posex_mng.new_path(self.path_prfx:GetText())
+end
+
+function PosInf46UI:path_prfx_GetText()    --/получить введенный текст в path_prfx
+	return self.path_prfx:GetText()
+end
+
+function PosInf46UI:Hide()
+	self:GetHolder():start_stop_menu(self, false)
+end
+
+function PosInf46UI:OnKeyboard(dik, keyboard_action)
+	CUIScriptWnd.OnKeyboard(self,dik,keyboard_action)
+	
+	if keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if (dik == DIK_keys.DIK_ESCAPE) then
+			var:HideDialog()
+		end
+	end
+end
+
+

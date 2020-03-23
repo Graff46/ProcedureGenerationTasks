@@ -1,0 +1,470 @@
+----------------------------------------------------------------------------------------------------
+-- Stander. parent >> Remark
+----------------------------------------------------------------------------------------------------
+--Remark:
+-- Разработчик: Andrey Fidrya (Zmey) af@svitonline.com
+-- Изменения: Didenko Ruslan.
+----------------------------------------------------------------------------------------------------
+--Stander
+-- by Graff46
+----------------------------------------------------------------------------------------------------
+
+local state_initial = 0
+local state_animation = 1
+local state_sound = 2
+local state_finish = 3
+
+local body_state_free = 0
+local body_state_danger = 1
+
+---------------------------------------------------------------------------------------------------------------------
+class "evaluator_need_remark" (property_evaluator)
+function evaluator_need_remark:__init(storage, name) super(nil, name)
+    self.st = storage
+end
+function evaluator_need_remark:evaluate()
+    return xr_logic.is_active(self.object, self.st)
+end
+
+----------------------------------------------------------------------------------------------------------------------
+class "action_remark_activity" (action_base)
+function action_remark_activity:__init (npc_name, action_name, storage) super(nil, action_name)
+	self.st = storage
+	self.was_reset  = false
+	self.followers = {}  --моё
+	self.kon = 1
+	self.ktime = 0
+	self.st.cell_p = 0,0,0
+end
+function action_remark_activity:initialize()
+  action_base.initialize(self)
+--  self.object:set_node_evaluator()
+--  self.object:set_path_evaluator()
+  self.object:set_desired_position()
+  self.object:set_desired_direction()
+  xr_sound.set_sound(self.object, nil)
+
+end
+function action_remark_activity:activate_scheme()
+    self.st.signals = {}
+    self.sound_end_signalled = false
+    self.action_end_signalled = false
+    self.anim_end_signalled = false
+
+	self.was_reset = true
+    self.vertex_id = nil
+    self.index = nil
+	self.st.signals["end"] = false
+    self.gon = 0 -- 0 - идем, 1 - стоим
+	
+	self.anm_time = 0
+	
+	
+  -- Определим нужно ли нам отыгрывать анимацию/поворачиваться на объект.
+	self.anim_scheduled = true
+	
+	-- Определим нужно ли нам отыгрывать отдельно звук после поворота.
+	if self.st.snd_anim_sync == false and
+	self.st.snd ~= nil 
+	then
+	self.snd_scheduled = true
+	else
+	self.snd_scheduled = false
+	end
+	
+	self.snd_started = false
+	
+	-- Задаем стартовое состояние
+	self.state = state_initial
+	self.tips_sound = nil
+end
+
+function action_remark_activity:get_target()
+	local look_tbl = {}
+
+  --' Если таргет не проинициализирован, то запускаем инициализатор.
+	if self.st.target_init == false then
+		--self.st.target_position, self.st.target_id, self.st.target_init = initialize_gulag_target(self.object, self.st.target)
+		if st.target_init == false then
+			return nil
+		end
+	end
+
+    if self.st.target_actor == true then
+        look_tbl.look_object = db.actor
+    end
+
+    if self.st.target_id then
+        look_tbl.look_object = level.object_by_id(self.st.target_id)
+    end
+
+    if self.st.target_position then
+        look_tbl.look_position = self.st.target_position
+    end
+
+    return look_tbl
+end
+
+function action_remark_activity:turn_end_callback()
+	printf("TURN END CALLBACK CALLED")
+end
+
+function action_remark_activity:time_callback()
+	printf("TIME CALLBACK CALLED")
+	self.state = state_sound
+	self:update()
+end
+
+function action_remark_activity:update()
+	if xr_logic.try_switch_to_another_section(self.object, self.st, db.actor) then
+		if db.storage[self.st.scheme] then db.storage[self.st.scheme] = nil return end
+		return
+	end
+	
+	if self.st.no_ai == true then
+		self.gon = 1
+		return self:animki()
+	end
+
+    local vid, vdist, vpos, npcpos = self:calculate_position () 
+    if self.gon == 0 then 
+		if vdist > self.st.exactness then 
+			self.object:set_dest_level_vertex_id (vid)
+			self.object:set_desired_position (vpos)
+			local dir = npcpos:sub(vpos)
+            dir:normalize ()
+			 
+			self.object:set_desired_direction (dir)
+			self.object:set_detail_path_type (move.line)
+			self.object:set_path_type (game_object.level_path)
+			
+			if (self.st.frun == false) and vdist > 15 then
+				state_mgr.set_state (self.object, "crazy_sprint")
+			else 
+				if vdist > 20 then
+					state_mgr.set_state (self.object, self.st.animation_sprint)
+				elseif vdist < 3 then
+					state_mgr.set_state (self.object, self.st.animation_move)
+				elseif vdist > 5 then
+					state_mgr.set_state (self.object, self.st.animation_run)	
+				end
+			end
+		else 
+			self.gon = 1
+		  -------------------------------
+			self.ktime = time_global() 
+			self.st.signals["end"] = true
+			self.st.frun = true
+			self.state = state_initial
+			self:animki()
+       end        
+    else 
+		if vdist <= self.st.exactness then 
+		
+			self.st.signals["end"] = true
+			self.st.frun = true
+			self.state = state_initial
+			self:animki()
+		else
+			self.gon = 0
+		end	
+	end
+end
+
+function action_remark_activity:animki()
+--' 1. Мы должны повернуться на объект.
+--printf("REMARK: [%s] state[%s]", self.object:name(), self.state)
+	if self.state == state_initial then
+		local cb = { obj = self, func = self.time_callback, turn_end_func = self.turn_end_callback }
+		local synsound
+		if self.st.snd_anim_sync == true then
+			self.snd_started = true
+			synsound = self.st.snd
+		else
+			synsound = nil
+		end
+		
+		local target = self:get_target()
+		
+		if target == nil then return end
+		
+		if self.st.anim_table and self.anm_time < time_global()  then
+			self.st.anim = nil
+			local i = math.random(table.getn(self.st.anim_table))
+			self.st.anim = self.st.anim_table[i][1]
+			self.anm_time = time_global() + self.st.anim_table[i][2] * 1000
+		end	
+		
+		state_mgr.set_state(self.object, self.st.anim, cb, 0, target, { animation = self.st.anim_reset }, synsound) 
+		
+		self.state = state_animation
+		
+	--' Ожидание колбека от стейтменеджера
+	elseif self.state == state_animation then
+	
+	--' 2. Мы должны отыграть фразу.
+	elseif self.state == state_sound then
+		--' Должны выдать сигнал anim_end
+		if self.anim_end_signalled == false then
+		self.anim_end_signalled = true
+		self.st.signals["anim_end"] = true
+		end
+	
+		if self.snd_scheduled == true then
+		self.snd_started = true
+		xr_sound.set_sound_play(self.object, self.st.snd, 50)
+		end
+		--' Нужно выдать связанный типс.
+		if self.st.tips_id ~= nil then
+		self.tips_sound = news_manager.send_tip_nosound(db.actor, self.st.tips_id, self.st.sender)
+		if self.tips_sound ~= nil then
+			--' Играем звук забитый
+			self.tips_sound:play(db.actor, 0, sound_object.s2d)
+		end
+		end
+	
+	
+		self.state = state_finish
+		
+	--' 3. Мы должны выдать сигнал об окончании действия
+	--' должны выдать сигнал action_end
+	--' должны выдать сигнал sound_end
+	elseif self.state == state_finish then
+		--' Проверить что звук уже запущен:
+		if self.snd_started == true then
+		if 1 then
+			self.snd_started = false
+		end
+		end
+	
+		if self.snd_started == false then
+		if self.sound_end_signalled == false then
+			self.st.signals["sound_end"] = true
+			self.sound_end_signalled = true
+		end
+		end
+	
+		if self.sound_end_signalled == true and
+		self.anim_end_signalled == true
+		then
+			if self.action_end_signalled == false then
+				self.st.signals["action_end"] = true
+				self.action_end_signalled = true
+			
+			return
+			end 
+		end
+	end
+end
+
+function action_remark_activity:calculate_position ()
+    -- получим от лидера ноду и направление
+    --local leader = level.object_by_id(self.st.leader_id)
+    local l_vid = self.st.l_vtx
+	local lvpos = level.vertex_position(l_vid)
+	local selfpos = self.object:position()
+	
+    local l_dir = vector():set(selfpos):sub(lvpos)
+	l_dir = l_dir:normalize ()
+ 
+    local dir = vector_rotate_y (l_dir, 179.0)
+    
+    if self.object:accessible (l_vid) == false then
+       l_vid = self.object:level_vertex_id () 
+       if self.object:accessible (l_vid) == false then
+          l_vid = self.object:accessible_nearest (level.vertex_position(l_vid), vector())
+       else
+          return l_vid, lvpos:distance_to (selfpos), lvpos, selfpos
+       end   
+    end    
+    
+    local need_id = self.object:vertex_in_direction (l_vid, dir, lvpos:distance_to (selfpos))
+    if need_id == -1 then
+       need_id = l_vid
+    else
+       if self.object:accessible (need_id) == false then
+          abort ("FOLLOWER %s, ACCESSIBLE VERTEX ID ERROR !!!", self.object:name ())
+       end 
+    end
+    
+    if self.object:accessible (need_id) == false then
+       need_id = l_vid
+       if self.object:accessible (need_id) == false then
+          printf ("!!!ERROR!!! Follower %s can't found accessible vertex id !!!", self.object:name ())
+          need_id = self.object:accessible_nearest(level.vertex_position(need_id), vector())
+          --abort ("ERROR: can't find vertex id for object %s", self.object:name ())
+       end 
+    end
+    
+    l_dir = level.vertex_position (need_id)
+    return need_id, l_dir:distance_to (selfpos), l_dir, selfpos
+end
+
+function action_remark_activity:reset_scheme ()
+    self.was_reset = true
+    self.vertex_id = nil
+    self.index = nil
+    self.gon = 0 -- 0 - идем, 1 - стоим
+	self.st.signals["end"] = false
+    self.st.signals["end"] = false
+end
+
+function action_remark_activity:execute()
+	action_base.execute(self)
+
+  --' Try to switch to another scheme:
+	if xr_logic.try_switch_to_another_section(self.object, self.st, db.actor) then
+		return
+	end
+	
+	self:update()
+end
+function action_remark_activity:finalize()
+  if self.tips_sound ~= nil then
+    self.tips_sound:stop()
+  end
+  action_base.finalize(self)
+  if self.index ~= nil then
+       --table.remove (db.storage[self.st.leader_id].followers, self.index)
+       self.index = nil
+    end   
+end
+
+----------------------------------------------------------------------------------------------------------------------
+--remark binder
+----------------------------------------------------------------------------------------------------------------------
+function add_to_binder(npc, ini, scheme, section, storage)
+    printf("DEBUG: add_to_binder [%s]: scheme='%s', section='%s'", npc:name(), scheme, section)
+      local operators = {}
+      local properties  = {}
+    
+      local manager = npc:motivation_action_manager()
+
+    properties["event"]     = xr_evaluators_id.reaction + 2
+    properties["need_remark"] = xr_evaluators_id.zmey_remark_base + 3
+    
+    operators["action_remark"] = xr_actions_id.zmey_remark_base + 3
+
+      -- // evaluators
+    manager:add_evaluator(properties["need_remark"], this.evaluator_need_remark(storage, "remark_need_remark"))
+
+    local new_action = this.action_remark_activity(npc, "action_remark_activity", storage)
+    new_action:add_precondition(world_property(stalker_ids.property_alive, true))
+    new_action:add_precondition(world_property(stalker_ids.property_danger,false))
+    new_action:add_precondition(world_property(stalker_ids.property_enemy, false))
+    new_action:add_precondition(world_property(stalker_ids.property_anomaly,false))
+    new_action:add_precondition(world_property(properties["need_remark"], true))
+    modules.add_common_precondition(scheme,new_action)
+      new_action:add_effect(world_property(properties["need_remark"], false))
+    manager:add_action(operators["action_remark"], new_action)
+
+    -- Зарегистрировать все actions, в которых должен быть вызван метод reset_scheme при изменении настроек схемы:
+    xr_logic.subscribe_action_for_events(npc, storage, new_action)
+
+      new_action = manager:action(xr_actions_id.alife)
+      new_action:add_precondition(world_property(properties["need_remark"], false))
+end
+
+
+function parse_target(target)
+    local pos = string.find(target, ",")
+    if pos then
+        return string.sub(target, 1, pos - 1), string.sub(target, pos + 1)
+    else
+        return target, nil
+    end
+end
+
+
+
+-- Включение схемы
+function set_scheme(npc, ini, scheme, section, gulag_name)
+	printf("DEBUG: set_scheme: scheme='%s', section='%s'", scheme, section)
+	local st = xr_logic.assign_storage_and_bind(npc, ini, scheme, section)
+	printf("DEBUG: set_scheme: storage assigned")
+	
+	st.logic     = xr_logic.cfg_get_switch_conditions(ini, section, npc)
+	
+	st.snd_anim_sync = ini:r_bool_ex(section, "snd_anim_sync", false)
+	
+	st.vtx = ini:r_string_ex (section, "lv",  nil)
+		if st.vtx then
+			st.l_vtx = tonumber(string.match(st.vtx, "^%D*(%d+).*[,]?") ) -- этот для логики !!!!
+		end
+	
+	st.exactness = tonumber(ini:r_string_ex (section, "extns", false)) 
+	if (not st.exactness) or st.exactness < 0.7 then
+		st.exactness = 2
+	end
+	
+	st.animation_move = ini:r_string_ex (section, "anim_walk", "patrol")
+	st.animation_run = ini:r_string_ex (section, "anim_run", "run") 
+	st.animation_sprint = ini:r_string_ex (section, "anim_sprint", "sprint") 
+	st.no_ai = ini:r_bool_ex(section, "no_ai", false)
+	
+    st.dont_change_job = true 
+	
+	st.snd      =  ini:r_string_ex(section, "snd", nil)
+	st.anim     =  xr_logic.parse_condlist(npc, "anim", "anim", ini:r_string_ex(section,"anim") or "wait")
+	st.anim_ran     = ini:r_string_ex(section, "anim_set", nil)
+	st.anim_table = nil
+		if st.anim_ran then
+			st.anim_table = {}
+			local anm_name, anm_delta
+			for str in string.gmatch(st.anim_ran, "%w+%p*%w+[(]?%d*[)]?") do
+				anm_name = string.match(str,"^(%w+%p*%w+).*")
+				anm_delta = string.match(str,"^.+[(](%d+)[)]")
+				if not anm_delta then anm_delta = 60 end
+				table.insert(st.anim_table,{anm_name, tonumber(anm_delta)})--[anm_name] = {anm_name = tonumber(anm_delta)}
+			end
+		end
+	st.tips_id    = ini:r_string_ex(section, "tips", "")
+	if st.tips_id then
+	st.sender = ini:r_string_ex(section, "tips_sender", "")
+	end
+	
+	
+	
+	if st.anim == "idle" then
+	abort("remark <abort>: object '%s', xr_remark.set_scheme: anim field cannot be [idle]", npc:name())
+	end
+	
+	st.frun = not ini:r_bool_ex(section, "first_run", true) 
+	st.anim_reset = ini:r_bool_ex(section, "anim_reset",  true)	
+	st.target =  ini:r_string_ex (section,   "target", "nil")
+	st.target_id = nil
+	st.target_actor = nil
+    if st.target and st.target ~= "nil" then
+      if st.target == "actor" then
+        st.target_actor = true
+        st.target_init = true
+      else
+      st.target_id = false
+          local sid, stnsid = tonumber(st.target), st.target 
+          if sid and alife():story_object(sid) then
+            st.target_id = id_by_sid(sid)
+			st.target_init = true
+		  elseif stnsid and nt.sstor_rd(stnsid) then
+			st.target_id = nt.sstor_rd(stnsid)
+			st.target_init = true
+            if not st.target_id then
+                  st.target_id = nil                
+            end
+            st.target_init = true
+			else 
+				--st.target_position, st.target_id, st.target_init = initialize_gulag_target(npc, st.target)
+            end
+      end
+    end  		
+
+		st.cell	= ini:r_string_ex (section, "cell", nil)
+		if st.cell ~= nil then 
+			local v = vector()
+			v.x = string.match(st.cell, "^.-([-]*[.-9]+).*[,]")
+			v.y = string.match(st.cell, "^.*[,].-([-]*[.-9]+).*[,]")
+			v.z = string.match(st.cell, ".*[,].*[,].-([-]*[.-9]+).*$")
+			st.target_position = v
+			st.target_id = nil
+			st.target_init = true
+		end
+end

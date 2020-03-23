@@ -1,0 +1,88 @@
+--**********************************--
+--**********************************--
+sim = alife()
+
+actor = level.object_by_id(0)
+
+function vec3(...)
+	return vector():set(...)
+end
+
+function pos(...)
+	if (...) then
+		local arg = {...}
+		return vec3(arg[1], arg[2], arg[3]), arg[4], arg[5]
+	end
+	
+	local pos = actor:position()
+	local lv, gv = actor:level_vertex_id(), actor:game_vertex_id()
+	pos.x = pos.x + 1.5 
+	return pos, lv, gv
+end
+
+function con (...)
+	return get_console():execute(...)
+end
+
+function spawn(...)
+	return sim:create(...)
+end
+
+pstor = {
+	save = function (name, val, npc)
+		return alun_utils.save_var(npc or actor , name, val)
+	end,
+	
+	load = function (name, def, npc)
+		return alun_utils.load_var(npc or actor , name, def)
+	end
+}
+
+function net_npc (id, tbl)
+	if not tonumber(id ) then
+		id = id.id
+	end
+	local data = sim_netp_utils.get_stalker_data(id)
+	for k, v in ipairs(tbl) do
+		data[k] = v
+	end
+	sim_netp_utils.set_stalker_data(data, id)
+end
+
+--*********************************--
+--*********************************--
+function net_spawn(binder)
+	if not has_alife_info("mystart") then
+		binder.object:give_info_portion("mystart")
+		--mymodul.fstart(binder)
+	end
+end
+
+local ii = 1
+function test(aa)
+	function start()
+		local npc = nt.spawn('stalker', vector():set(-8.510684, 7.499130, 4.037048), 191155, 1026)
+		local pk = stpk_utils.get_stalker_data(npc)
+		if pk then
+			pk.custom_data = "[smart_terrains]\nnone = true\n\n[logic]\n cfg = logic\\test.ltx"
+			stpk_utils.set_stalker_data(pk, npc)
+		end	
+		
+		return  nt.spawn('zat_b40_notebook', vector():set(31.442949, -0.023743, -4.539495), 226391, 1013), npc
+	end
+	
+	if aa then
+		local strg, snpc = start()
+		
+		add_story_object(snpc.id, "chel"..tostring(ii)) 
+		add_story_object(strg.id, "cellnoute"..tostring(ii))
+		printf("!Start0")
+		
+		local q = dynqst.dynQuest('mynotebook'..tostring(ii), aa, strg.id, snpc.id)
+		q:set_state()
+		ii = ii + 1
+		
+		--
+		printf("!Start1")
+	end 
+end

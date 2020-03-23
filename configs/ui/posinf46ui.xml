@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<PosInf46UI>
+    <frame x="35" y="95" width="855" height="581">
+		<header x="241" y="100" width="258" height="19" stretch="1">
+			<text font="letterica16" r="0" g=" 255" b=" 0" complex_mode="1">Конструктор данных позиций</text>
+		</header>
+	
+        <texture>ui_icons_PDA_dialog</texture>
+        <campos x="388" y="73" width="32" height="23">
+            <text font="letterica16" r="255" g="255" b="255">По камере (иначе по модели)</text>
+        </campos>
+        <btn_pos_scrpt x="41" y="68" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Спавн скриптом</text>
+        </btn_pos_scrpt>
+        <btn_pos_tbl x="167" y="68" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Таблица</text>
+        </btn_pos_tbl>
+        <btn_path_scr x="539" y="73" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Путь для скриптов</text>
+        </btn_path_scr>
+        <Static_point x="136" y="44" width="60" height="19" stretch="1">
+            <text font="letterica16" r="215" g="195" b="170" complex_mode="1">Точка</text>
+        </Static_point>
+        <btn_path_allspw x="693" y="73" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Путь для all.spawn</text>
+        </btn_path_allspw>
+        <frame_list x="41" y="116" width="769" height="428" top_indent = "1">
+            <texture>ui_cb_listbox</texture>
+            <listing x="5" y="3" width="759" height="420" stretch="1" complex_mode="1" top_indent = "1"></listing>
+        </frame_list>
+        <btn_tofile x="375" y="546" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Запись в файл</text>
+        </btn_tofile>
+		
+		<btn_clrfile x="75" y="546" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Очистить файл</text>
+        </btn_clrfile>
+		
+        <path_prfx x="539" y="38" width="117" height="24" password="0">
+            <texture>ui_linetext_e</texture>
+            <text font="letterica18" align="l" r="255" g="255" b="255" />
+        </path_prfx>		
+		<path_name x="139" y="38" width="117" height="24" password="0">
+            <texture>ui_linetext_e</texture>
+            <text font="letterica18" align="l" r="255" g="255" b="255" />
+        </path_name>
+        <btn_crt_path x="693" y="36" width="117" height="29">
+            <texture>ui_button_ordinary</texture>
+            <text font="letterica16" x="0" y="0" align="c" vert_align="c" r="255" g="255" b="255">Создать путь</text>
+        </btn_crt_path>
+    </frame>
+</PosInf46UI>

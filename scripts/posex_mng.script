@@ -1,0 +1,75 @@
+
+
+
+local tbl_path = {}
+function add_path_p()
+local pos, lv, gv = db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id()
+	if tbl_path.name then
+		table.insert(tbl_path, {lv, gv, pos})
+	end
+end
+
+function add_path_look()
+local pos = db.actor:position()
+	if tbl_path.name then    
+		tbl_path[table.getn(tbl_path)].look = pos
+	end
+end
+
+function get_data ()
+	return tbl_path
+end
+
+function clear_tbl ()
+	tbl_path = {}
+end
+
+function new_path (txt)
+	tbl_path.name = txt
+end
+
+
+function logfile (lgtext) -- запись текста в файл
+lgtext = tostring(lgtext)
+local f
+local file = getFS():update_path("$game_data$", "PosExtr.txt")
+   f = io.open(file,"r") -- Пытается открыть файл в режиме "чтения/записи"
+   if f == nil then  -- Если файл не существует
+      f = io.open(file,"w") -- Создает файл в режиме "записи"
+	  if f then 
+		f:close();-- Закрывает файл
+		--f = io.open(file,"a")-- Открывает уже существующий файл в режиме "чтения/записи"
+      end
+   end
+   f = io.open(file, "a")
+   if f then
+		f:write(lgtext)
+		f:flush()
+		f:close()
+	end
+end
+
+function rdFile()
+	local path = getFS():update_path("$game_data$", "PosExtr.txt")
+	f = io.open(path) -- Пытается открыть файл в режиме "чтения/записи"
+	if not f then  -- Если файл не существует
+		return ""
+	else
+		local str = f:read("*a")
+		f:close()
+		return string.gsub(str, "[\r\n]", '\\n')
+	end
+end
+
+function clear_file()
+local file = getFS():update_path("$game_data$", "PosExtr.txt")
+	f = io.open(file,"r") -- Пытается открыть файл в режиме "чтения/записи"
+	if f then  -- Если файл существует
+		io.open(file,"w")
+		--f:write(lgtext)
+		f:flush()
+		f:close()
+	end
+end
+
+
