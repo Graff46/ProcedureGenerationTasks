@@ -1,0 +1,66 @@
+local print = function(x) return get_console():execute(tostring(x)) end
+
+local pos = db.actor:position()
+local lv, gv = db.actor:level_vertex_id(), db.actor:game_vertex_id()
+pos.x = pos.x + 1.5 
+
+local aa = level.get_target_obj() 
+
+
+function start()
+	local npc = nt.spawn('stalker', vector():set(-8.510684, 7.499130, 4.037048), 191155, 1026)
+	--local pk = stpk_utils.get_stalker_data(npc)
+	--if pk then
+	--	pk.custom_data = "[smart_terrains]\nnone = true\n\n[logic]\n cfg = logic\\test.ltx"
+	--	stpk_utils.set_stalker_data(pk, npc)
+	--end	
+	
+	return  nt.spawn('zat_b40_notebook', vector():set(31.442949, -0.023743, -4.539495), 226391, 1013), npc
+end
+
+if false then
+	local strg, snpc = start()
+	
+	add_story_object(snpc.id, "chel") 
+	add_story_object(strg.id, "cellnoute")
+	printf("!Start0")
+	
+	local q = dynqst.dynQuest('mynotebook', aa, strg.id, snpc.id)
+	q:set_state()
+	
+	--alife():teleport_object(aa:id(), gv, lv, pos)
+
+	--local hh = aa:motivation_action_manager()
+	----print( hh:current_action_id() )
+	--print( hh:remove_action(88) )
+	--
+	printf("!Start1")
+end 
+
+--local bb = alife():object(aa:id())
+
+if bb then
+	
+end
+
+if aa then
+	my.test(aa)
+	--aa: :on_unregister()
+	print('HI!')
+end
+
+
+
+
+
+
+--task_manager.get_task_manager():give_task('mynotebook')
+
+
+
+--dynqst.dyn_quest(aa, alife():object(26129), upd)
+
+
+
+
+
