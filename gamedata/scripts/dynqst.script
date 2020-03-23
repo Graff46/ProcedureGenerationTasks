@@ -140,7 +140,7 @@ function dynQuest:set_state()
 	--xr_logic.pick_section_from_condlist(db.actor, self.executor, self.on_init)
 end
 
-function dyn_quest(npc, sobj, thisClass) 
+function dyn_quest(npc, sobj, thisClass)  
 	local npc_id = npc:id()
 
 	if db.storage[npc_id].active_scheme then

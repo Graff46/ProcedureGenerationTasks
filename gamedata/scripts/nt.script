@@ -1,0 +1,792 @@
+--[[
+	Автор: Graff46
+	Скриптовая библиотека мода "Новое Время"
+]]
+
+--***************************************************************--
+--[[ Реализация аналога сториИД. Теперь можно метить любой спавн объект (у меня сидом не метились машины) не только номером, но и строкой.
+ В ответ на вызов метки получим ИД объекта или серверный/клиентский объект. 
+-- Метить можно кого угодно в любое время после спавна. Метка работает сразу, при назначении другому объекту
+	существующей метки - метка перезапишется на новый объект. Не требуется заводить список меток и пручую ерунду,
+	всё работает сразу. Также можно удалить метку в любой момент с объекта.
+	05.06.18 STLK2 уже анонсирован
+	ids - может быть задан таблицей идов: {343432, 1222, 45} - 1 метка на массив объектов.
+	add - если метка существует, то новый ид добавить к ней.
+]]
+
+local alife2 = alife()
+
+
+function sstor_wr (ids, sname, add)  -- запись метки на объект. (ids:ИД_объекта, sname:имя_метки)
+	local str = false; 
+	local old = sstor_rd(sname)
+	
+	if old and add then
+		if type(old) ~= "table" then old = {old} end
+		if type(ids) ~= "table" then ids = {ids} end
+		for i=1, #old do
+			table.insert(ids, old[i])
+		end
+	end
+				
+	if type(ids) == "table" then 
+		for i=1, #ids do
+			str = string.format("%s%s|", str or "|", ids[i] or "")
+		end 
+	else
+		str = tonumber(ids) 
+	end 
+	my.pstor.save('nstor_'..sname, str)
+end
+
+-- получение объекта или ИДа. (sname:имя_метки, *typ:объект_выдачи npc или его id, клиентский_или_серверный).
+-- Если typ == true, то получим npc иначе ИД. Если cl == true, тогда ф-ция возвратит клинтский объект НПС, иначе серверный.																				* - не обязательный параметр
+function sstor_rd (sname, typ, cl, fname) 
+local val = false
+local tbl = {}
+	--**************
+	function reading (vl, tp, cle, funame)
+		vl = tonumber(vl) 
+		funame = funame or function() end
+		local obj = alife2:object(vl) 
+		if obj then
+			funame(vl, obj)
+			if tp and tp == true then 
+				if cle and cle == true then
+					return level.object_by_id(vl)
+				else
+					return obj 
+				end
+			else
+				return vl
+			end
+		else
+			return false
+		end 
+	end
+	--**************
+
+	val = my.pstor.load('nstor_'..sname)
+	
+	if val then
+		if (not tonumber(val)) and string.find(val, "|") then
+			for n in string.gmatch(val, "(%d+)[|]") do
+				table.insert(tbl, reading (n, typ, cl, fname) ) 
+			end
+			return tbl
+		else
+			return reading (val, typ, cl, fname)
+		end	
+	end
+end
+
+-- Удаление метки или мечененного объекта. (sname:имя_метки, *npc:тип_удаления) если npc == true, тогда удалится объект под меткой, иначе только метка.
+function sstor_del (sname, npc, cut) 
+	if db.storage[0].pstor ~= nil and db.storage[0].pstor['nstor_'..sname] or (se_stor and se_stor.get(sname, nil) ) then
+	
+		function _delete()
+			local sim = alife ()
+			if npc and npc == true then
+				if not sim then return end
+				local a = sstor_rd(sname, true)
+				if a then
+					if type(a) ~= "table" then a = {a} end
+					for i=1, #a do
+						if a[i] then
+							sim:set_switch_online (a[i].id, false)
+							sim:set_switch_offline (a[i].id, true)
+							alife2:release(a[i], true)
+						end
+					end
+				end
+			end
+		end
+		
+		if cut then
+			val = my.pstor.load('nstor_'..sname, false)
+			if not val then return end
+			local str = string.gsub(val, string.format("|%s|", tostring(cut)), "")
+			
+			my.pstor.save('nstor_'..sname, str)
+			_delete()
+		else
+			_delete()
+			my.pstor.save('nstor_'..sname, nil)
+		end
+	end
+end
+--*********************************************************************************************************--
+
+-- Спавн (секция, позиция, *скриптовая_метка, сториИД(если установлен X-Ray extensions), *описание_метки_на_карте, *тип_метки("green_location'))
+function spawn (obj, pos, lv, gv, sn, story_id, hint_metka, metka_type) 
+local sim = alife2
+	local alb = sim:create(obj, pos,lv,gv)
+
+	if sn and sn ~= "_" then
+		if type(sn) == 'table' then
+			sstor_wr (alb.id, sn[1], true) 
+		else
+			sstor_wr (alb.id, sn) 
+		end
+	end
+	if story_id then
+		sim:assign_story_id(nil, nil, alb.id, story_id) 
+	end
+	if hint_metka then
+		level.map_add_object_spot_ser(alb.id, metka_type or "green_location", hint_metka)
+	end
+	return alb
+end
+
+function set_dir(id, dir) -- установка дирекции (поворота) объекта через нэт-пакет (нужны правки скриптов с типами объектов)
+local sobj = alife2:object(id) 
+	if sobj then 
+		local pk = get_netpk(sobj, 0) 
+		if pk:isOk() then 
+			return pk:setCallback( { direction = dir } )
+		end
+	end
+	return false
+end
+
+function spawn_in(box, item, callbk) -- Заспавнить НПСу в инвентарь
+	local a = alife2:create(item ,box:position(),box:level_vertex_id(),box:game_vertex_id(), box:id())
+	if callbk and a then
+		level.client_spawn_manager():add(a.id, 0,
+	    function(id, obj)
+			box:transfer_item(obj, box)
+			if type(callbk) == "function" then 
+				callbk(obj)
+			end
+	    end )
+	end
+	return a
+end
+
+function give_gun(npc, item)
+	nt.spawn_in(npc, item, true)
+	local slot = this.get_data_obj (item, "slot", "number", nil)
+	if not slot then return end
+	local b = npc:item_in_slot(slot)
+	alife2:release(alife2:object(b:id()), true)
+	local ammo = this.get_data_obj (item, "ammo_class")
+	if not ammo then return end
+	ammo = string.match(ammo, "([^,]+)[,]-.*")
+	nt.spawn_in(npc, ammo, true)
+end
+
+function give_actor(item) -- Заспавнить ГГ в инвентарь
+	return spawn_in(db.actor, item)
+end
+
+function play_sound (path) -- Играть звук в голове ГГ. path - путь до файла звука
+	local t = xr_sound.get_safe_sound_object(path) -- путь до звукового файла
+    t:play_no_feedback(db.actor, sound_object.s2d, 1, vector(), 1.0) 
+end
+
+function set_task (name, timer, repl)
+	if not name then return end
+	local new_task = CGameTask()
+	new_task:load(name) -- 
+	db.actor:give_task(new_task, timer or 0, not repl)
+end
+
+function get_data_obj (section, parametr, data_type, def_data) -- Получения параметра из секции объекта. (секция, имя_параметра, *тип_данных_ожидаемого_параметра(number, bool, иначе всегда string), *данные_по_умолчанию,_если_нет_параметра)
+	local sini = system_ini()
+	if data_type == "number" then
+		return utils.cfg_get_number(sini, section, parametr, false, false, def_data)
+	elseif data_type == "bool" then
+		return utils.cfg_get_bool(sini, section, parametr, false, false, def_data)
+	else	
+		return utils.cfg_get_string(sini, section, parametr, false, false, nil, def_data)
+	end
+end
+
+function run_demo(name, sound, func, second) -- запуск дэмки из *.xrdemo
+	local _FS = getFS()
+	if not _FS:exist(_FS:update_path("$game_saves$", name..".xrdemo")) then
+		if not second then
+			my_script.replace_xrdemo()
+			return _G.nt.run_demo(name, sound, func, true)
+		end
+		return false
+	end
+	func = func or noop
+	if db.actor:get_current_holder()  then
+		local pos, dir = db.actor:position(), db.actor:direction()
+		local v = pos
+		v.x = pos.x - 3 * math.cos(dir:getH())
+		v.z = pos.z - 3 * math.sin(dir:getH())
+		db.actor:detach_vehicle(v)
+	end
+	get_console():execute(string.format("demo_play\t%s", name))
+	
+	if sound then
+		play_sound (sound)
+	end
+
+	function cond()
+		return db.actor:position():distance_to(device().cam_pos) > 2
+	end
+	
+	function post ()
+		level.hide_indicators()
+		level.disable_input()
+		
+		function postcond ()
+			return db.actor:position():distance_to(device().cam_pos) < 1.66
+		end
+		
+		function pact () 
+			level.show_indicators()
+			level.enable_input()
+			func()
+		end
+		
+		level.add_call(postcond, pact)
+	end
+	level.add_call(cond, post)
+end
+
+function save_game (name)
+	get_console():execute(string.format("save\t%s", name or ""))
+end
+ 
+function anim_start (npc, anim)
+	state_mgr.set_state(npc, anim)
+end
+
+function in_level (pos, lv, gv, npos, nlv, ngv, sid, dir, win, hint, psid, sbox) -- для совместимости
+	lvlChr (pos, lv, gv, npos, nlv, ngv, sid, dir, win, hint, psid, sbox)
+end
+
+function lvlChr (pos, lv, gv, npos, nlv, ngv, sid, dir, win, hint, psid, sbox)
+	-- поз-я, лв, гв, поз-я переноса, лв переноса, гв переноса, *сториИд, *направлениеГГ после переноса, *1\0 запрос перехода, *метка:{*типМетки, текстметки}, *сстор, *типШейпа
+	-- типШейпа - таблица, если в ней есть ключ type со сначением 0, то шейп чанжера будет сферой, радиусом = 1й элемент таблицы (без ключа), центр сферы(смещение) это 2-е значение (вектор!) или без смещения, если type нету или ~= 0, то 1-й 2-й и 3-й элемент таблицы это длина сторон прямоугольника, соответственно по осям  X, Y, Z. Пример: {type=0, 5} - Это сфера с радиусом 5м, центр сферы в позиции спавна; {type=0, 5, vector():set(0, 0, 3)} - как и в предыдущем, но центр сферы смещён на 3 метра по оси Z от точки спавна; {2,5,4} - прямоугольный шейп со сторонами 2,5,4 м соответственно по осям XYZ.
+	-- * - не обязательный параметр.
+	hint = hint or {}
+	if hint == "none" then hint = {"none", ""} end
+	dir = dir or vector():set(0, 0, 0)
+	local name = game.translate_string(alife2:level_name(game_graph():vertex(ngv):level_id()))
+	level_mover.create_level_changer(sid or -1, pos, lv, gv, nlv, ngv, npos, dir, name, win or 0, hint[1], psid, sbox, hint[2])
+end 
+
+function actor_teleport (pos, lv, gv, dir) -- Телепорт ГГ на другую локацию и не только, параметры: actor_teleport ({x,y,z}-координаты позиции, level_vertex, game_vertex, *{x,y,z}-поворот дирекшн) 
+	if db.actor then 
+		sstor_del ("act_tlp", true)
+		local act_pos, act_lv, act_gv = db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id()
+		if dir then
+			dir_pos = vector():set(dir[1],dir[2],dir[3])
+		else
+			dir_pos = vector():set(0,0,0)
+		end
+		local lvlchnr = level_mover.create_level_changer(-1, act_pos, act_lv, act_gv,lv,gv,vector():set(pos[1],pos[2],pos[3]), dir_pos, alife2:level_name(game_graph():vertex(gv):level_id()), 1, "none")
+		sstor_wr (lvlchnr.id, "act_tlp")
+	end
+end
+
+function get_logic(obj, file, pfile)
+	if type(obj) == 'number' then
+		obj = alife2:object(obj)
+	end
+	
+	local data = m_netpk.get(obj)
+	data = data:get()
+	data = data.custom_data:getStringRaw()
+	if file then 
+		return this.logfile(data, pfile or string.format("custom_data_%s.ltx", obj:name()))
+	else
+		return data
+	end
+end
+
+function logic_active(obj, ltx, str) 
+	if type(obj) == 'number' then
+		obj = alife2:object(obj)
+	end
+	local pk = m_netpk.get(obj)
+	local data = pk:get()
+	if str then
+		data.custom_data:setString(tostring(ltx)) 
+	else
+		data.custom_data:setString("[smart_terrains]\nnone = true\n[logic]\ncfg = "..ltx or "") 
+	end
+	return pk:set(data)   
+end
+
+function set_logic (id, ltx, gsect)
+	local ini_filename, ini = "", ""
+	if type(id) == "number" then
+		obj = level.object_by_id(id)
+	else
+		obj = id
+	end
+	if obj then
+		if db.storage[obj:id()].active_scheme then
+			xr_logic.issue_event(obj, db.storage[obj:id()][db.storage[obj:id()].active_scheme], "deactivate", obj)
+		end
+		
+		ini = ini_file(ltx)
+		ini_filename = ltx
+		
+		ini = xr_logic.configure_schemes(obj, ini, ini_filename, 0, "logic", nil)
+		local sect = xr_logic.determine_section_to_activate(obj, ini, "logic", db.actor)
+		xr_logic.activate_by_section(obj, ini, gsect or sect, false)
+	end
+end
+
+function logic2(obj, inipath, fname)
+	fname = fname or noop
+	if type(obj) == 'number' then 
+		obj = alife2:object(obj)
+	end
+	logic_active(obj, inipath) 
+	level.client_spawn_manager():add(obj.id, 0,
+		function(id, cobj)
+			set_logic (cobj, inipath)
+			fname(id, cobj)
+		end )
+	
+end
+
+function setActiveLogic(obj, inipath)
+	if type(obj) == 'number' then
+		obj = level.object_by_id(obj)
+	end
+	local sobj = alife2:object(obj:id() )
+	
+	logic_active(sobj, inipath)  
+	set_logic (obj, inipath)
+	
+end
+
+function relod_logic (obj, gtsect) -- Только клинтские объекты, которые заспавнены по секциям из конфигов!!!
+local ini_filename = ""
+	if obj and type(obj:id())=='number' then
+		if db.storage[obj:id()].active_scheme then
+			xr_logic.issue_event(obj, db.storage[obj:id()][db.storage[obj:id()].active_scheme], "deactivate", obj)
+		end
+		local ini 
+		local sini= system_ini()
+		if sini:section_exist(obj:section()) then
+			for i=1, sini:line_count(obj:section()) do 
+				local indx, key, value = sini:r_line(obj:section(),i,"","") 
+				if key == "custom_data" then
+					ini = ini_file(value)
+					ini_filename = value
+					break
+				end
+			end
+			
+			ini = xr_logic.configure_schemes(obj, ini, ini_filename, 0, "logic", nil)
+			local sect = xr_logic.determine_section_to_activate(obj, ini, "logic", db.actor)
+			xr_logic.activate_by_section(obj, ini, gtsect or sect, false)
+		end
+	end
+end
+
+function mylog (txtlog)-- запись сложного текста в консоль
+	local systext = txtlog
+	systext = string.gsub(systext, "[\r\n]",'\\n')
+	systext = string.gsub(systext, '%s','_')
+	get_console():execute(systext)
+	get_console():execute("flush")
+end
+
+function logfile (lgtext, fname) -- запись текста в файл
+	lgtext = tostring(lgtext)
+	local file = getFS():update_path("$game_data$", fname or "mylog.txt")
+	
+   f = io.open(file,"r") -- Пытается открыть файл в режиме "чтения/записи"
+   if f == nil then  -- Если файл не существует
+      f = io.open(file,"w") -- Создает файл в режиме "записи"
+	  if f then 
+		f:close();-- Закрывает файл
+		f = io.open(file,"a")-- Открывает уже существующий файл в режиме "чтения/записи"
+      end
+   end
+   f = io.open(file,"a")
+   if f then
+		f:write(lgtext.."\n")
+		f:flush()
+		f:close()
+	end
+	return lgtext
+end
+
+function myspawn (sct_obj, pos, lv, gv, sn)
+	local sobj = spawn (sct_obj, pos, lv, gv, sn)
+	local pk = m_netpk.get(sobj)
+	local data, sini, abs_tbl, abs_flag = pk:get(),  system_ini(), {}, false
+	local pkabs
+	local out_tbl = {}
+	if sini:section_exist(sct_obj) and pk:isOk() then 
+		for i=1, sini:line_count(sct_obj) do 
+			local all_line, key, value = sini:r_line(sct_obj,i,"","") 
+			if string.sub(key, 0,5) == '&std.' then
+				data[string.sub(key,6 ,-1)] = value
+			elseif string.sub(key, 0,5) == '&upd.' then
+				data.upd[string.sub(key, 6, -1)] = value
+			elseif string.sub(key, 0,5) == '&abs.' then
+				pkabs = m_netpk.get(sobj, 0)
+				abs_flag = true
+				abs_tbl[string.sub(key,6 ,-1)] = loadstring(value)()
+			end
+		end
+		if abs_flag and pkabs:isOk() then
+			abs_flag = false
+			out_tbl[1] = pkabs:setCallback(abs_tbl)
+			return {out_tbl[1], sobj}
+		end
+		out_tbl[1] = pk:set(data)
+	end
+	out_tbl[2] = sobj
+	return out_tbl
+end
+
+function net_edit (obj, idx, tbl, cus_dt)
+	local Ptbl = tbl or {}
+	if type(idx) == "table" then
+		Ptbl = idx
+		idx = nil 
+		if type(tbl) == "string" then
+			cus_dt = tbl
+		end
+	end
+	
+	local pk = m_netpk.get(obj, idx)
+	if idx and idx==0 then
+		return pk:setCallback(Ptbl)
+	else
+		local data = pk:get()
+		for k,v in pairs(Ptbl) do 
+			data[k] = v
+		end
+		if cus_dt then
+			data.custom_data:setString("[smart_terrains]\nnone = true\n\n[logic]\n cfg = "..cus_dt) 
+		end
+		pk:set(data)
+	end
+end
+
+
+function net_display (obj)
+local pk = m_netpk.get(obj)
+	if not pk then return end
+	logfile(pk:dumpDesc(), 'net_desc.txt')
+end
+
+function jsn_wr (a) -- Псевдо джейсон
+local strfrm = string.format
+	a = a:gsub('%s+','') 
+
+  local b,c, e
+  for b,c in a:gmatch('([:])(%S)') do
+    if c~='{' and c~='[' then
+      a = a:gsub(b..c, strfrm('%s"%s',b,c)) 
+    end
+  end
+
+  for b,c in a:gmatch('[[].*([%S])([,]).*[]]') do
+    if b~='}' and b~=']' then
+      a = a:gsub(b..c, strfrm('%s"%s"',b,c)) 
+    end
+  end
+  
+  for b,c in a:gmatch('(%S)([]])') do
+    if b~='}' and b~=']' then
+      a = a:gsub(b..c, strfrm('%s"%s',b,c)) 
+    end
+  end
+  
+  for b,c in a:gmatch('([[])(%S)') do 
+    if c~='}' and c~=']' then
+      a = a:gsub(strfrm('[%s]%s', b,c), strfrm('%s"%s',b,c)) 
+      
+    end
+  end
+  
+  for b,c in a:gmatch('([:]["]%S-)(%p)') do
+    a = a:gsub(b..c, strfrm('%s"%s',b,c))
+  end
+  
+  a=a:gsub('[[]','{')
+  a=a:gsub('[]]','}')
+  a=a:gsub(':','=')
+  return loadstring ('return'..a)() 
+end
+
+function inline_str (str)
+	return string.gsub(str, "[\r\n]",'\\n')
+end
+
+function pstor_save (name, val)
+	if se_stor then
+		se_stor.set(name, val)
+	else
+		xr_logic.pstor_store(db.actor, name, val)
+	end
+end
+
+function pstor_load (name, deflt, del)
+local var
+	if se_stor then
+		var = se_stor.get(name, deflt)
+	else
+		var = xr_logic.pstor_retrieve(db.actor, name, deflt)
+	end
+	if del then
+		pstor_del(name)
+	end
+	return var
+end
+
+function pstor_del (name)
+	if se_stor then
+		se_stor.set(name, nil)
+	else
+		if db.storage[db.actor:id()].pstor[name] then
+			db.storage[db.actor:id()].pstor[name] = nil
+		end
+	end
+end
+
+function timer(msec, action, fpath, fcondpath) -- таймер\коллбэк
+--[[ msec: просто число если микросекунды, строка вида: "[число]upd" ( "5upd" ) - количество апдейтов ГГ, если ф-ция,
+ то ф-ция должна возвратить true что бы вызвался action; fpath - если хотите записать вызов в пстор (на случай сейв\лоад), то тут пишем путь до вызываемой ф-ции! пример: escape_dialog.myfunc, при вызове ф-ции у неё не будет аргументов ]]
+local deltaTime = 0
+local cond, dlt, argStr = _, 0, ""
+	function condMsec ()
+		return game.time() > deltaTime
+	end
+		
+	function cntUpd ()
+		dlt = dlt + 1
+		return dlt > tonumber(msec)
+	end
+	
+	function cntGameUpd()
+		dlt = dlt + 1
+		return dlt > tonumber(msec)
+	end
+	
+	function cntbool ()
+		return not not msec
+	end
+	
+	function call ()
+		--pstor_del("nttimer")
+		local psr = pstor_load("nttimer", "")
+		psr = string.gsub(psr, argStr, "") 
+		pstor_save ('nttimer', psr)
+		action()
+	end
+	
+	if type(msec) == "string" then
+		if msec:match('^%d+upd$') then
+			cond = cntUpd 
+			msec = string.match(msec, '%d+')
+		elseif msec:match('^%d+game$') then
+			msec = string.match(msec, '%d+')
+			deltaTime = time_global() + msec
+			cond = cntGameUpd
+		end
+	elseif type(msec) == "function" then 
+		cond = msec
+	elseif type(msec) == "number" then
+		if msec < 0 then
+			cond = cntbool
+		else
+			deltaTime = game.time() + (msec * level.get_time_factor())
+			cond = condMsec 
+		end
+	elseif type(msec) == "boolean" then
+		cond = cntbool
+	end
+
+	if fpath then 
+		local _oldStr = pstor_load("nttimer", "")
+		if cond == condMsec then
+			argStr = string.format('%d|%s', tonumber(msec), fpath or "noop")
+			local str = string.format('%s|%s', _oldStr, argStr)
+			pstor_save("nttimer", str) 
+		elseif cond == cntUpd then
+			argStr = string.format('%s|%s', "true", fpath or "noop")
+			local str = string.format('%s|%s', _oldStr, argStr)
+			pstor_save("nttimer", str)
+		elseif fcondpath and cond == msec then
+			argStr = string.format('%s|%s',  fcondpath, fpath or "noop")
+			local str = string.format('%s|%s', _oldStr, argStr)
+			pstor_save("nttimer", str)
+		end
+		level.add_call(cond, call) 
+	else 
+		level.add_call(cond, action) 
+	end
+end
+
+function net_spw() -- ссылку на это сделать в биндер ГГ в нэт_спавн!
+local psr = pstor_load('nttimer', "")
+	if psr:len() > 0 then
+		for flag, fpath in string.gmatch(psr, "[|]([^|]+)[|]([^|]+)") do
+			if tonumber(flag) then 
+				local modul, fname  = string.match(fpath, "([^.]+)[.](.+)") 
+				psr = string.gsub(psr, string.format("[|]%s[|]%s", flag, fpath), "") 
+				pstor_save ('nttimer', psr)	
+				--local oTime, modul = string.match(modul, "(%d+)[&](.+)") 
+				timer( tonumber(flag), _G[modul][fname], fpath) 
+			elseif flag == 'true' then
+				local modul, fname  = string.match(fpath, "([^.]+)[.](.+)")
+				psr = string.gsub(psr, string.format("[|]%s[|]%s", flag, fpath), "")
+				pstor_save ('nttimer', psr)
+				_G[modul][fname]()
+			else
+				local Cmodul, Cfname = string.match(flag, "([^.]+)[.]([^|]+)")
+				if _G[Cmodul] and _G[Cmodul][Cfname] and type(_G[Cmodul][Cfname]) == "function" then
+					psr = string.gsub(psr, string.format("[|]%s[|]%s", flag, fpath), "")
+					pstor_save ('nttimer', psr)
+					local modul, fname  = string.match(fpath, "([^.]+)[.]([^|]+)")
+					timer(_G[Cmodul][Cfname], _G[modul][fname], fpath, flag)
+				end
+			end
+		end
+	end
+end
+
+--[[	wr_free_sids()
+	Файл с результатами (free_sids.txt) будет  в папке gamedata.
+Строка вида: Free > [Story_Id] - свободны - под сидом нет объекта на момент сканирования,
+строка вида: In_list as: [СекцияИзStory_ids.ltx] > [Story_Id] - свободны, но отмечены секцией в файле story_ids.ltx,
+строка вида: [СекцияИзStory_ids.ltx] > [Story_Id] - Заняты (под сидом есть объект на момент сканирования).
+]]
+function wr_free_sids()
+	local obj, gini = false, game_ini() 
+	for i=1,65534,1 do  
+		obj = alife2:story_object(i)
+		if not obj then
+			if gini:line_exist("story_ids", tostring(i)) then
+				logfile(string.format("In_list as: %s > %d", gini:r_string("story_ids", tostring(i)), i), "free_sids.txt")
+			else
+				logfile(string.format("Free: %d", i), "free_sids.txt")
+			end
+		else
+			logfile(string.format("%s > %s", tostring(obj:name()), i), "free_sids.txt")
+		end
+	end
+end
+
+function obj_rep(obj, pos, lv, gv, fname)
+	fname = fname or noop
+	local npc, rnpc
+	if type(obj) ~= 'table' then obj = {obj} end
+	for k,v in pairs(obj) do
+		if tonumber(k) and type(v) == 'string' then
+			npc = alife2:story_object(k)
+		elseif type(k) == 'string' and type(v) == 'string' then
+			npc = sstor_rd(k, true)
+			if type(npc) == "table" then
+				npc = npc[1]
+			end
+		elseif type(v) == 'userdata' then
+			npc = npc
+			if type(npc.id) ~= 'number' then
+				npc = alife2:object(npc:id())
+			end
+			v = npc:section_name()
+		end
+
+		if npc and npc.alive and npc:alive() then
+			alife2:teleport_object("", pos, lv, gv, npc.id)
+			rnpc = npc
+		elseif v then
+			rnpc = spawn(v, pos, lv, gv, k)
+		end
+		fname(rnpc)
+	end
+end
+
+function spw_lampa(...)
+	local lmp = spawn('mylampa', ...)
+	net_edit(lmp, _, {
+		visual_name = 'fonar'                     ,
+		main_color = GetARGB(100, 1, 1, 0)        ,
+		main_brightness = 1                       ,
+		main_color_animator = 'light\\light_myred',
+		main_range = 3                            ,
+		light_flags = 111                         ,
+		health = 100                              ,
+		main_virtual_size = 8                	   ,
+		ambient_radius = 7.5                        ,
+		ambient_power = 0.045                		,
+		main_bone = 'bone_lamp'                   ,
+		main_cone_angle = math.pi-0.001           ,
+		glow_radius = 0.69999999                  ,
+		ambient_bone = 'bone_omni'
+		}
+	)
+	return lmp
+end
+
+function test ()
+
+end
+
+
+--*********************************************************--
+--Не моё! С Интернета.
+--// "библиотечная" функция  
+local function unwind_protect(thunk,cleanup)  
+  local ok,res = pcall(thunk)  
+  if cleanup then cleanup() end  
+  if not ok then error(res,0) else return res end  
+end  
+--// общая функция для работы с открытыми файлами  
+local function with_open_file(name,mode)  
+	return function(body)  
+		local f = assert(io.open(name,mode))  
+		return unwind_protect(function()return body(f) end,  
+			function()return f and f:close() end)  
+	end  
+end  
+--// собственно os-copy --  Использовать для копирования файлов и если доступно os. и io. в LUA!
+function os_copy2(source_path, dest_path)  
+  return with_open_file(source_path,"rb") (function(source)  
+    return with_open_file(dest_path,"wb") (function(dest)  
+      assert(dest:write(assert(source:read("*a"))))  
+      return 'copy ok'  
+    end)  
+  end)  
+end  
+--___________________________________________________________________
+
+-- meta-system
+
+function to_client (obj, fun)
+	level.client_spawn_manager():add(obj.id, 0,
+	    function(id, obj)
+			return fun(obj)
+	    end )
+end
+
+
+--___________________________________________________________________
+--[[шрифты 
+"GetFontSmall"
+"GetFontMedium"
+"GetFontDI"
+"GetFontGraffiti19Russian"
+"GetFontGraffiti22Russian"
+"GetFontLetterica16Russian"
+"GetFontLetterica18Russian"
+"GetFontGraffiti32Russian"
+"GetFontGraffiti50Russian"
+"GetFontLetterica25"
+GetFontLetterica16Russian()
+GetFontLetterica18Russian()
+GetFontGraffiti19Russian()
+GetFontGraffiti22Russian()
+GetFontArialN21Russian()
+GetFontHeaderRussian()
+GetFontBigDigit()
+]]
+

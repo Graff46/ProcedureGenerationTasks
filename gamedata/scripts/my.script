@@ -73,6 +73,7 @@ function test(aa)
 	
 	if aa then
 		local strg, snpc = start()
+		
 		add_story_object(snpc.id, "chel"..tostring(ii)) 
 		add_story_object(strg.id, "cellnoute"..tostring(ii))
 		printf("!Start0")

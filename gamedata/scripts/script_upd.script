@@ -1,28 +1,18 @@
 local print = function(x) return get_console():execute(tostring(x)) end
 
---local pos = db.actor:position()
+local pos = db.actor:position()
 --local lv, gv = db.actor:level_vertex_id(), db.actor:game_vertex_id()
 --pos.x = pos.x + 1.5 
 
 local aa = level.get_target_obj() 
 
 
-
 if aa then
-	my.test(aa) 
+	my.test(aa)
 	print('HI!')
 end
 
 
-
-
-
-
---task_manager.get_task_manager():give_task('mynotebook')
-
-
-
---dynqst.dyn_quest(aa, alife():object(26129), upd)
 
 
 
