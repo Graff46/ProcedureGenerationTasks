@@ -1,2 +1,2 @@
-configs/* linguist-vendored
+gamedata/configs/* linguist-vendored
 *.script linguist-vendored=false
