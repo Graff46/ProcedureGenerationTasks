@@ -1,2 +1,2 @@
-* linguist-vendored
-*.lua linguist-vendored=false
+configs/* linguist-vendored
+*.script linguist-vendored=false
