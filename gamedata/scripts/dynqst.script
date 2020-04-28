@@ -13,18 +13,18 @@ class "DynQuest"
 function DynQuest:__init(id, executor, employer)
 	local task_ini 		= task_manager.task_ini
 	
-	self.target			= task_ini:r_string_ex(id, "target")
-	self.target			= xr_logic.parse_condlist(nil, "task", "task_condlist", self.target)
-	self.type_work		= type_work
 	self.executor		= executor -- Исполнитель -и
+	self.target			= task_ini:r_string_ex(id, "target")
+	self.target			= xr_logic.parse_condlist(self.executor, "task", "task_condlist", self.target)
+	self.type_work		= type_work
 	self.employer		= employer -- работодатель
 	self.keeper			= self.employer  -- храниль -и
-	self.last_target	= self.current_target
+	--self.currentTargetId
 		
-	self.mystate			= 1
+	self.mystate			= 0
 	self.switcher			= false
 		
-	self.curr_action		= dtask_actions.rtrue  -- ф-ция которая выполнится если условие достижения цели выполнено, должно возвратить true чтобы учесть дейтвие выполненным и разрешить переключение на следующие цели (сделать шаг)
+	self.currAction		= dtask_actions.rtrue  -- ф-ция которая выполнится если условие достижения цели выполнено, должно возвратить true чтобы учесть дейтвие выполненным и разрешить переключение на следующие цели (сделать шаг)
 	self.conder				= dtask_actions.def_conder -- Ф-ция - условие для состояния достижения цели 
 	
 	self._strTarget	= self:targetParser() -- строка: стори ИД цели
@@ -42,44 +42,49 @@ function DynQuest:__init(id, executor, employer)
 end
 
 function DynQuest:targetParser()
-	local strTarget = xr_logic.pick_section_from_condlist(db.actor, self.executor, self.target)
+	if self.mystate == 0 then
+		self.currentTargetId = self.employer.id
+		return self.currentTargetId
+	end
+	
+	local strTarget = xr_logic.pick_section_from_condlist(db.actor, self.executor, self.target) -- Парсятся цели из строки {+infp -infp =fun !fun} section %+infp -infp =fun%
 	if self._strTarget == strTarget then
-		return self.current_target
+		return strTarget
 	end
 		
 	self._strTarget = strTarget
 	local hndlr, conder = 'rtrue', 'def_conder'
 	local targetStoryId
 	
-	if string.find(strTarget, "|") then 
-		targetStoryId, hndlr = string.match(strTarget, "(.+)[|](.+)")
+	if string.find(self._strTarget, "|") then 
+		targetStoryId, hndlr = string.match(self._strTarget, "(.+)[|](.+)")
 		
-		if string.find(strTarget, "|") then
-			targetStoryId, conder = string.match(strTarget, "(.+)[|](.+)")
+		if string.find(targetStoryId, "|") then
+			targetStoryId, conder = string.match(targetStoryId, "(.+)[|](.+)")
 		end
 	end
 	 
-	self.curr_action = dtask_actions[hndlr]
+	self.currAction = dtask_actions[hndlr]
 	self.conder = dtask_actions[conder]
 	
-	self.current_target = get_story_object_id(targetStoryId)
+	self.currentTargetId = get_story_object_id(targetStoryId)
 	return targetStoryId
 end
 
 function DynQuest:changeTarget (id)
-	self.current_target = id
-	self.switcher(self.current_target)
+	self.currentTargetId = id
+	self.switcher(self.currentTargetId)
 end
 
 function DynQuest:step(logic)
 	log("~STEP|"..tostring(self.mystate))
 	
-	if self.mystate > 1 then 
-		if self:curr_action() then 
+	if self.mystate > 0 then 
+		if self:currAction() then 
 			self.mystate = self.mystate + 1
 		end 
 	else
-		self.switcher(self.current_target) 
+		self.switcher(self.currentTargetId) 
 		self.mystate = self.mystate + 1
 	end
 end
@@ -107,9 +112,8 @@ function DynQuest:update(binder)
 		return abort("DynQst: new target parsing as nil!") 
 	end
 	
-	if self.current_target ~= t_target then
-		self.current_target = t_target
-		self.switcher(self.current_target) 
+	if self.currentTargetId ~= t_target then
+		self:changeTarget(self.currentTargetId) 
 	end
 
 	for i=1, #self.condlist do
@@ -127,8 +131,7 @@ function DynQuest:set_state()
 	end
 end
 
-function DynQuest:setLogic(npc, sobj, thisClass)  
---self.executor, sim:object(targetID), self
+function DynQuest:setLogic()  
 	local npc_id = self.executor
 	
 	if not db.storage[npc_id] then
@@ -144,9 +147,7 @@ function DynQuest:setLogic(npc, sobj, thisClass)
 	end
 
 	local scheme, section, filename = "pointer", "pointer", 'xr_mytest'
-		log '!WORK1'
 	db.storage[npc_id].overrides = nil
-		log '!WORK2'
 	db.storage[npc_id].activation_time = time_global()
 	db.storage[npc_id].activation_game_time = game.get_game_time()
 	local a = _G[filename].set_scheme(self.executor, self.employer, self)
