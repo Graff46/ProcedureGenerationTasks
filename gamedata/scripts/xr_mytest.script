@@ -96,7 +96,6 @@ function go_target:execute()
 		elseif (self.state ~= 0) or (self.lastPos:distance_to_sqr(self.st.purpose.position) >1) then
 			--state_mgr.set_state (self.object, "run")
 			self:get_path()
-			printf("#goner")
 			self.lastPos = self.st.purpose.position
 		end
 	end

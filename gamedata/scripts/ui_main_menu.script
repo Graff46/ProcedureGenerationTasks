@@ -329,6 +329,12 @@ function main_menu:OnKeyboard(dik, keyboard_action)  --virtual function
 			posinf46.start() 
 		elseif (dik == DIK_keys.DIK_U) then
 			if _G['script_upd'] then _G['script_upd'] = nil end
+		elseif (dik == DIK_keys.DIK_I) then
+			local tr = level.get_target_obj() 
+			if tr  then
+				my.test(tr)
+				print('HI!')
+			end
 		end
 	end
 
