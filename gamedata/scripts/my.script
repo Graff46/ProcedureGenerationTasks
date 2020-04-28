@@ -76,13 +76,13 @@ function test(aa)
 		
 		add_story_object(snpc.id, "chel"..tostring(ii)) 
 		add_story_object(strg.id, "cellnoute"..tostring(ii))
-		printf("!Start0")
+		log("~ !Start0")
 		
-		local q = dynqst.dynQuest('mynotebook'..tostring(ii), aa, strg.id, snpc.id)
+		local q = dynqst.DynQuest('mynotebook'..tostring(ii), aa, snpc)
 		q:set_state()
 		ii = ii + 1
 		
 		--
-		printf("!Start1")
+		log("~ !Start1")
 	end 
 end

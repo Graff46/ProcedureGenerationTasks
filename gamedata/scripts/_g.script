@@ -409,8 +409,6 @@ function printf(fmt,...)
 	end	
 end
 
-log1 = printf -- my temp
-
 function spairs(t, order)
     -- collect the keys
     local keys = {}

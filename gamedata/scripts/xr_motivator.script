@@ -387,7 +387,7 @@ function motivator_binder:update(delta)
 	local object = self.object
 	local id = object:id()
 
-	self:updDynQuest(db.storage[id].curr_qsts)
+	self:updDynQuest()
 	--alun_utils.debug_nearest(object,"motivator_binder:update(%s)",delta)
 	
 	xr_sound.update(id)

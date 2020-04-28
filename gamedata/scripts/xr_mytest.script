@@ -1,33 +1,11 @@
 local sim = alife()
 
-class "need" (property_evaluator)
-
-function need:__init(storage, name, npc, dynQt) super(nil, name)
-	self.dyn_qt = dynQt
-	self.npc_id = npc:id()
-end
-
-function need:evaluate()
-	return db.storage[self.npc_id].curr_qsts == self.dyn_qt 
-end
-
-class "on_need_point" (property_evaluator)
-
-function on_need_point:__init(storage, name, npc) super(nil, name)
-	self.st = storage
-	self.object = npc
-end
-
-function on_need_point:evaluate()
-	return (self.st.purpose) and (self.st.purpose.position:distance_to_sqr(self.object:position()) < 6) or false
-end
-
 class "go_target" (action_base)
 
-function go_target:__init (npc, action_name, storage, dynQt) super(nil, action_name)
+function go_target:__init (npc, action_name, storage, dynQuest) super(nil, action_name)
 	self.st = storage
 	self.object = npc 
-	self.dynQt = dynQt
+	self.dynQuest = dynQuest
 	self.parent_purpose = false
 	self.lastPos = false
 
@@ -93,7 +71,7 @@ function go_target:anim()
 	--state_mgr.set_state(self.object, anm, cb, 0, {look_position = self.st.purpose.position})
 	self.state = 1
 	
-	self.dynQt:step(self)
+	self.dynQuest:step(self)
 	printf("EVENT!")
 end
 
@@ -101,17 +79,17 @@ function go_target:execute()
 	action_base.execute(self)
 	
 	if self.st.purpose then
-		if (self.st.obj_purpose.parent_id ~= 65535) and (self.st.purpose == self.st.obj_purpose) then 
+		if (self.st.global_purpose.parent_id ~= 65535) and (self.st.purpose == self.st.global_purpose) then 
 			self.st.purpose = sim:object(self.st.purpose.parent_id)
 			printf("~new|self.st.purpose|"..self.st.purpose.id)
 			self.parent_purpose = true
-		elseif (self.st.obj_purpose.parent_id == 65535) and (self.st.purpose ~= self.st.obj_purpose) then
-			self.st.purpose = self.st.obj_purpose
+		elseif (self.st.global_purpose.parent_id == 65535) and (self.st.purpose ~= self.st.global_purpose) then
+			self.st.purpose = self.st.global_purpose
 			printf("~old|self.st.purpose")
 			self.parent_purpose = false
 		end
 	
-		if self.dynQt:conder(self) then
+		if self.dynQuest:conder(self) then
 			if self.state ~= 1 then
 				self:anim()
 			end
@@ -160,17 +138,38 @@ function end_anim:evaluate()
 end
 
 class "eva_property_alife"  ( property_evaluator )
-function eva_property_alife:__init( name, npc, dynQt) super ( nil, name )
-	self.dyn_qt = dynQt
+function eva_property_alife:__init( name, npc, dynQuest) super ( nil, name )
+	self.dynQuest = dynQuest
 	self.npc_id = npc:id()
 end
 
 function eva_property_alife:evaluate()
-	return db.storage[self.npc_id].curr_qsts == self.dyn_qt 
+	return db.storage[self.npc_id].currDynQuest == self.dynQuest 
 end 
 
+class "need" (property_evaluator)
 
-function add_to_binder(npc, ini, scheme, section, storage, dynQt)
+function need:__init(storage, name, npc, dynQuest) super(nil, name)
+	self.dynQuest = dynQuest
+	self.npc_id = npc:id()
+end
+
+function need:evaluate()
+	return db.storage[self.npc_id].currDynQuest == self.dynQuest 
+end
+
+class "on_need_point" (property_evaluator)
+
+function on_need_point:__init(storage, name, npc) super(nil, name)
+	self.st = storage
+	self.object = npc
+end
+
+function on_need_point:evaluate()
+	return (self.st.purpose) and (self.st.purpose.position:distance_to_sqr(self.object:position()) < 2) or false
+end
+
+function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
 	printf("@add_to_binder")
 	local operators	= {}
 	local properties  = {}
@@ -180,12 +179,12 @@ function add_to_binder(npc, ini, scheme, section, storage, dynQt)
 	operators["act_point"] = xr_evaluators_id.zmey_remark_base + 2
 	operators["anims"] = xr_evaluators_id.zmey_remark_base + 3
 	
-	properties["has"] = xr_actions_id.zmey_remark_base + 4
+	properties["needed"] = xr_actions_id.zmey_remark_base + 4
 	properties["at_point"]  = xr_actions_id.zmey_remark_base + 5
 	properties["anim_end"] = xr_actions_id.zmey_remark_base + 6
 	properties["state_mgr_logic_active"] 	= xr_evaluators_id.state_mgr + 4
 		 -- evaluators
-	manager:add_evaluator(properties["has"], this.need(storage, "has_uniq_uniq", npc, dynQt))
+	manager:add_evaluator(properties["needed"], this.need(storage, "has_uniq_uniq", npc, dynQuest))
 	manager:add_evaluator(properties["at_point"], this.on_need_point(storage, "on_need_point_uniq", npc))
 	manager:add_evaluator(properties["anim_end"], this.end_anim(storage, "anim_end"))
 
@@ -196,23 +195,23 @@ function add_to_binder(npc, ini, scheme, section, storage, dynQt)
 	--new_action2:add_precondition(world_property(stalker_ids.property_anomaly, false))
 	--modules.add_common_precondition(scheme, new_action2) 
 	--
-	--new_action2:add_precondition(world_property(properties["has"], true))
+	--new_action2:add_precondition(world_property(properties["needed"], true))
 	--new_action2:add_precondition(world_property(properties["at_point"], true))
 	--manager:add_action(operators["anims"], new_action2) 
 
-	local new_action = this.go_target(npc, "go_target_uniq", storage, dynQt)
+	local new_action = this.go_target(npc, "go_target_uniq", storage, dynQuest)
 	new_action:add_precondition(world_property(stalker_ids.property_alive, true))
 	new_action:add_precondition(world_property(stalker_ids.property_danger, false))
 	new_action:add_precondition(world_property(stalker_ids.property_enemy, false))
 	new_action:add_precondition(world_property(stalker_ids.property_anomaly, false))
 	modules.add_common_precondition(scheme, new_action)
 	
-	new_action:add_precondition(world_property(properties["has"], true))
+	new_action:add_precondition(world_property(properties["needed"], true))
 	--new_action:add_precondition(world_property(properties["at_point"], false))
 	--new_action:add_effect (world_property(properties["at_point"], true))
 	--new_action:add_precondition(world_property(properties["anim_end"], false))
-	new_action:add_effect (world_property(properties["has"], false))
-	new_action:add_effect (world_property(properties["state_mgr_logic_active"], false))
+	new_action:add_effect (world_property(properties["needed"], false))
+	--new_action:add_effect (world_property(properties["state_mgr_logic_active"], false))
 	manager:add_action(operators["act_point"], new_action)
 	
 	
@@ -221,16 +220,15 @@ function add_to_binder(npc, ini, scheme, section, storage, dynQt)
 	--local actionW = manager:action(stalker_ids.action_alife_planner)
 	--local action = cast_planner(actionW) --property_alife
 	--action:remove_evaluator(stalker_ids.property_alife)
-	--action:add_evaluator(stalker_ids.property_alife, eva_property_alife( "reached_task_location", npc, dynQt))
 
 	local action = manager:action(stalker_ids.action_alife_planner)
 
-	action:add_precondition(world_property(properties["has"], false))
-	action:add_precondition (world_property(properties["state_mgr_logic_active"], false))
-	action:add_effect (world_property(properties["has"], true))
+	action:add_precondition(world_property(properties["needed"], false))
+	--action:add_precondition (world_property(properties["state_mgr_logic_active"], false))
+	action:add_effect (world_property(properties["needed"], true))
 end
 
-function set_scheme(npc, sobj, dynQt)
+function set_scheme(npc, target, dynQuest)
 	xr_logic.reset_generic_schemes_on_scheme_switch(npc, 'pointer', 'pointer')
 	
 	local id = npc:id()	
@@ -246,7 +244,7 @@ function set_scheme(npc, sobj, dynQt)
 	st.npc = npc
 	st.logic = {}
 	
-	this.add_to_binder(npc, ini, "pointer", 'pointer', st, dynQt)
+	this.add_to_binder(npc, ini, "pointer", 'pointer', st, dynQuest)
 
 
 	st.section = "pointer"
@@ -258,23 +256,23 @@ function set_scheme(npc, sobj, dynQt)
 	
 	st.logic     = {}
 
-	st.obj_purpose = sobj
-	st.purpose = sobj
+	st.global_purpose = target
+	st.purpose = target
 	st.finish = false
 	
-	return function (newPurposeId, finish)
+	return function (newPurposeId, finish) -- switcher
 		if finish then
 			local bind = npc:binded_object()
 			bind.updDynQuest = function() end
 			st.finish = true
 			db.storage[id].active_section = nil
 			db.storage[id].active_scheme = nil
-			db.storage[npc:id()].curr_qsts = false
+			db.storage[npc:id()].currDynQuest = false
 			printf("~finish")
 			return st.finish
 		else
-			st.obj_purpose = sim:object(newPurposeId) 
-			st.purpose = st.obj_purpose
+			st.global_purpose = sim:object(newPurposeId) 
+			st.purpose = st.global_purpose
 			return true
 		end
 	end

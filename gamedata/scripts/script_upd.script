@@ -7,10 +7,13 @@ local pos = db.actor:position()
 local aa = level.get_target_obj() 
 
 
-if aa then
+if aa  then
 	my.test(aa)
 	print('HI!')
 end
+
+
+
 
 
 

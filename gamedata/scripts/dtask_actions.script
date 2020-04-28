@@ -2,7 +2,7 @@
 local sim = alife()
 
 function rtrue()
-	printf("~ACT2") 
+	log("~ACT2") 
 	return true
 end
 
@@ -11,19 +11,20 @@ function complete(dqobj)
 	return true
 end
 
-function take_obj(dqobj)
-printf("~ACT") 
-	local sobj, npc = sim:object(dqobj.current_target), dqobj.executor
-
-	local rucObj = sim:create(sobj:section_name(), vector(), 1, 1, npc:id() )
+function take_obj(dynQuest)
+	log("~ACT") 
+	local obj, npc = get_story_object(dynQuest.current_target), dynQuest.executor
+	obj:transfer_item(obj, npc)
 	
-	level.client_spawn_manager():add(rucObj.id, 0,
-	    function(id, obj)
-			npc:transfer_item(obj, npc)
-	    end )
-	sim:release(sobj, true)
-
-	return true
+	--local rucObj = sim:create(sobj:section_name(), vector(), 1, 1, npc:id() )
+	--
+	--level.client_spawn_manager():add(rucObj.id, 0,
+	--    function(id, obj)
+	--		npc:transfer_item(obj, npc)
+	--    end )
+	--sim:release(sobj, true)
+	
+	--return true
 end 
 
 function def_conder(_, lgk)
