@@ -146,7 +146,8 @@ function DynQuest:setLogic()
 		db.storage[npc_id].overrides = nil
 	end
 
-	local scheme, section, filename = "pointer", "pointer", 'xr_mytest'
+	local scheme, section, filename = "pointer", "pointer", 'xr_targeter'
+	modules.reset_generic_schemes(self.executor, scheme, section)
 	db.storage[npc_id].overrides = nil
 	db.storage[npc_id].activation_time = time_global()
 	db.storage[npc_id].activation_game_time = game.get_game_time()

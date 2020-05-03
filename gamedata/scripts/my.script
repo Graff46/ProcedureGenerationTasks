@@ -54,7 +54,7 @@ end
 function net_spawn(binder)
 	if not has_alife_info("mystart") then
 		binder.object:give_info_portion("mystart")
-		--mymodul.fstart(binder)
+		--mymodul.fstart(binder) 
 	end
 end
 
@@ -76,13 +76,11 @@ function test(aa)
 		
 		add_story_object(snpc.id, "chel"..tostring(ii)) 
 		add_story_object(strg.id, "cellnoute"..tostring(ii))
-		log("~ !Start0")
+		log("~ !Start"..tostring(ii))
 		
 		local q = dynqst.DynQuest('mynotebook'..tostring(ii), aa, snpc)
 		q:set_state()
 		ii = ii + 1
 		
-		--
-		log("~ !Start1")
 	end 
 end

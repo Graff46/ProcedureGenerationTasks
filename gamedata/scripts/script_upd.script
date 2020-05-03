@@ -7,10 +7,7 @@ local pos = db.actor:position()
 local aa = level.get_target_obj() 
 
 
-if aa  then
-	my.test(aa)
-	print('HI!')
-end
+print(db.storage[aa:id()].active_section)
 
 
 
