@@ -8,6 +8,7 @@ local aa = level.get_target_obj()
 
 
 print(db.storage[aa:id()].active_section)
+print(not not db.storage[aa:id()].currDynQuest)
 
 
 

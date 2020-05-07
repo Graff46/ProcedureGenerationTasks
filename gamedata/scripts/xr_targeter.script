@@ -3,21 +3,21 @@ local sim = alife()
 class "go_target" (action_base)
 
 function go_target:__init (npc, action_name, storage, dynQuest) super(nil, action_name)
+	log("# go_target:__init")
+
 	self.st = storage
 	self.object = npc 
 	self.dynQuest = dynQuest
 	self.parent_purpose = false
 	self.lastPos = false
-
 end 
 
 function go_target:initialize() 
 	action_base.initialize(self)
 	self.state = -1 -- 0 go, 1 anim, 2 ?
-	printf("@go_target:initialize")
+	log("# go_target:initialize")
 	
 	self.lastPos = self.st.purpose.position
-	self:goner() 
 end
 
 function go_target:goner()
@@ -47,22 +47,28 @@ function go_target:get_path()
 		utils.send_to_nearest_accessible_vertex(self.object, self.st.purpose.m_level_vertex_id, "xr_targeter")
 		self.object:set_desired_position(self.st.purpose.position)
 	else
-		self.object:set_dest_game_vertex_id		( self.st.purpose.m_game_vertex_id)
+		self.object:set_dest_game_vertex_id ( self.st.purpose.m_game_vertex_id)
 		self.object:set_path_type ( game_object.game_path )
 	end
-	self.object:set_sight					(look.path_dir, nil, 0)
+	self.object:set_sight (look.path_dir, nil, 0)
 	self.state = 0
 	state_mgr.set_state (self.object, 'run')
 end
 
 function go_target:anim_end()
-	log("anim_end")
+	log("# anim_end")
 	self.state = 2
 
 end
 
 function go_target:activate_scheme()
-	log("go_target.activate_scheme")
+	log("# go_target.activate_scheme")
+	return self:goner() 
+end
+
+function go_target:reset_scheme()
+	log("# go_target.reset_scheme")
+	
 end
 
 function go_target:anim()
@@ -76,16 +82,17 @@ function go_target:anim()
 end
 
 function go_target:execute()
+	log "~ go_target:execute"
 	action_base.execute(self)
 	
 	if self.st.purpose then
 		if (self.st.global_purpose.parent_id ~= 65535) and (self.st.purpose == self.st.global_purpose) then 
 			self.st.purpose = sim:object(self.st.purpose.parent_id)
-			log("~new|self.st.purpose|"..self.st.purpose.id)
+			log("# new|self.st.purpose|"..self.st.purpose.id)
 			self.parent_purpose = true
 		elseif (self.st.global_purpose.parent_id == 65535) and (self.st.purpose ~= self.st.global_purpose) then
 			self.st.purpose = self.st.global_purpose
-			log("~old|self.st.purpose")
+			log("# old|self.st.purpose")
 			self.parent_purpose = false
 		end
 	
@@ -100,60 +107,15 @@ function go_target:execute()
 	end
 end
 
-class "wait_action" (action_base)
-
-function wait_action:__init (npc, action_name, storage) super(nil, action_name)
-	self.st = storage
-	self.object = npc
-	self.st.dqAnim = false
-end
-
-function wait_action:initialize()
-	action_base.initialize(self) 
-end
-
-function wait_action:activate_scheme()
-	log("wait_action.activate_scheme")
-end
-
-function wait_action:time_callback()
-	self.st.dqAnim = true
-end
-
-function wait_action:execute ()
-	action_base.execute(self)
-	log("initialize_wait_action")
-end
-
-class "end_anim" (property_evaluator)
-
-function end_anim:__init(storage, name) super(nil, name)
-	self.st = storage
-end
-
-function end_anim:evaluate()
-	return true
-end
-
-class "eva_property_alife"  ( property_evaluator )
-function eva_property_alife:__init( name, npc, dynQuest) super ( nil, name )
-	self.dynQuest = dynQuest
-	self.npc_id = npc:id()
-end
-
-function eva_property_alife:evaluate()
-	return db.storage[self.npc_id].currDynQuest == self.dynQuest 
-end 
-
 class "need" (property_evaluator)
 
 function need:__init(storage, name, npc, dynQuest) super(nil, name)
 	self.dynQuest = dynQuest
-	self.npc_id = npc:id()
+	self.store = db.storage[npc:id()]
 end
 
 function need:evaluate()
-	return db.storage[self.npc_id].currDynQuest == self.dynQuest 
+	return self.store.currDynQuest == self.dynQuest 
 end
 
 class "on_need_point" (property_evaluator)
@@ -168,62 +130,40 @@ function on_need_point:evaluate()
 end
 
 function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
-	log("@add_to_binder")
+	log("# add_to_binder")
 	local operators	= {}
 	local properties  = {}
 
 	local manager = npc:motivation_action_manager()
 	
-	operators["act_point"] = xr_evaluators_id.zmey_remark_base + 2
-	operators["anims"] = xr_evaluators_id.zmey_remark_base + 3
+	operators["action_targeter"] = xr_evaluators_id.zmey_remark_base + 2
 	
 	properties["needed"] = xr_actions_id.zmey_remark_base + 4
-	properties["at_point"]  = xr_actions_id.zmey_remark_base + 5
+	properties["at_point"] = xr_actions_id.zmey_remark_base + 5
 	properties["anim_end"] = xr_actions_id.zmey_remark_base + 6
-	properties["state_mgr_logic_active"] 	= xr_evaluators_id.state_mgr + 4
-		-- evaluators
-	manager:add_evaluator(properties["needed"], this.need(storage, "has_uniq_uniq", npc, dynQuest))
-	manager:add_evaluator(properties["at_point"], this.on_need_point(storage, "on_need_point_uniq", npc))
-	manager:add_evaluator(properties["anim_end"], this.end_anim(storage, "anim_end"))
-
-	--local new_action2 = this.wait_action(npc, "wait_action_uniq", storage)
-	--new_action2:add_precondition(world_property(stalker_ids.property_alive, true))
-	--new_action2:add_precondition(world_property(stalker_ids.property_danger, false))
-	--new_action2:add_precondition(world_property(stalker_ids.property_enemy, false))
-	--new_action2:add_precondition(world_property(stalker_ids.property_anomaly, false))
-	--modules.add_common_precondition(scheme, new_action2) 
-	--
-	--new_action2:add_precondition(world_property(properties["needed"], true))
-	--new_action2:add_precondition(world_property(properties["at_point"], true))
-	--manager:add_action(operators["anims"], new_action2) 
+	properties["state_mgr_logic_active"] = xr_evaluators_id.state_mgr + 4
+	-- evaluators
+	
+	manager:add_evaluator(properties["needed"], this.need(storage, "has_uniq_uniq", npc, dynQuest)) -- exist task on NPC
+	manager:add_evaluator(properties["at_point"], this.on_need_point(storage, "on_need_point_uniq", npc)) -- distance to target < 2
 
 	local new_action = this.go_target(npc, "go_target_uniq", storage, dynQuest)
 	new_action:add_precondition(world_property(stalker_ids.property_alive, true))
 	new_action:add_precondition(world_property(stalker_ids.property_danger, false))
 	new_action:add_precondition(world_property(stalker_ids.property_enemy, false))
 	new_action:add_precondition(world_property(stalker_ids.property_anomaly, false))
-	modules.add_common_precondition(scheme, new_action)
 	
 	new_action:add_precondition(world_property(properties["needed"], true))
-	--new_action:add_precondition(world_property(properties["at_point"], false))
-	--new_action:add_effect (world_property(properties["at_point"], true))
-	--new_action:add_precondition(world_property(properties["anim_end"], false))
+	modules.add_common_precondition(scheme, new_action)
 	new_action:add_effect (world_property(properties["needed"], false))
 	new_action:add_effect (world_property(properties["state_mgr_logic_active"], false))
-	manager:add_action(operators["act_point"], new_action)
+	manager:add_action(operators["action_targeter"], new_action)
 	
-	
+	-- Зарегистрировать все actions, в которых должен быть вызван метод reset_scheme при изменении настроек схемы:
 	xr_logic.subscribe_action_for_events(npc, storage, new_action)
-	
-	--local actionW = manager:action(stalker_ids.action_alife_planner)
-	--local action = cast_planner(actionW) --property_alife
-	--action:remove_evaluator(stalker_ids.property_alife)
 
-	local action = manager:action(stalker_ids.action_alife_planner)
-
-	action:add_precondition(world_property(properties["needed"], false))
-	action:add_precondition (world_property(properties["state_mgr_logic_active"], false))
-	action:add_effect (world_property(properties["needed"], true))
+	new_action = manager:action(xr_actions_id.alife)
+	new_action:add_precondition(world_property(properties["needed"], false))
 end
 
 function set_scheme(npc, target, dynQuest)
@@ -256,18 +196,12 @@ function set_scheme(npc, target, dynQuest)
 	st.purpose = target
 	st.finish = false
 	
-	return function (newPurposeId, finish) -- switcher
+	return function (newPurposeId, finish) -- dynqst.DynQuest.switcher
 		if finish then
-			local bind = npc:binded_object()
-			bind.updDynQuest = function() end
 			st.finish = true
-			db.storage[id].active_section = nil
-			db.storage[id].active_scheme = nil
-			db.storage[id]["pointer"] = nil
-			db.storage[npc:id()].currDynQuest = false
-			xr_logic.issue_event(npc, st, "deactivate", npc, st)
-			log("~ finish")
-			return st.finish
+			log("# finish")
+			dynQuest:shutdown()
+			return dynQuest:deactivateScheme(st)
 		else
 			st.global_purpose = sim:object(newPurposeId) 
 			st.purpose = st.global_purpose

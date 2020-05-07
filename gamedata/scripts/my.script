@@ -78,7 +78,7 @@ function test(aa)
 		add_story_object(strg.id, "cellnoute"..tostring(ii))
 		log("~ !Start"..tostring(ii))
 		
-		local q = dynqst.DynQuest('mynotebook'..tostring(ii), aa, snpc)
+		local q = dynqst.DynQuest('mynotebook'..tostring(ii), aa, snpc, strg)
 		q:set_state()
 		ii = ii + 1
 		
