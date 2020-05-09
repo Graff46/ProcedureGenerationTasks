@@ -2,42 +2,47 @@ local sim = alife()
 
 class "DynQuest" 
 
---[[
+--[[ --TODO
 	type_work:
 	0 - Забрать предмет.
 	1 - Ликвидация.
 	2 - Приблизится (имитация взаимодействия).
 	3 - Сопровождение.
-]]
+]] --TODO
 
-function DynQuest:__init(id, executor, employer)
+function DynQuest:__init(id, executor, employer, subject)
 	local task_ini 		= task_manager.task_ini
 	
-	self.executor		= executor -- Исполнитель -и
+	self.executor		= executor -- Исполнитель
 	self.target			= task_ini:r_string_ex(id, "target")
 	self.target			= xr_logic.parse_condlist(self.executor, "task", "task_condlist", self.target)
-	self.type_work		= type_work
+	self.type_work		= type_work --TODO
 	self.employer		= employer -- работодатель
 	self.keeper			= self.employer  -- храниль -и
+	self.storage		= {}  -- Хранилище свободных данных для квеста
+	self.subject		= subject  -- Субъект квеста (server object)
 	--self.currentTargetId
 		
-	self.mystate			= 0
-	self.switcher			= false
+	self.mystate		= 0
+	self.switcher		= false
 		
 	self.currAction		= dtask_actions.rtrue  -- ф-ция которая выполнится если условие достижения цели выполнено, должно возвратить true чтобы учесть дейтвие выполненным и разрешить переключение на следующие цели (сделать шаг)
-	self.conder				= dtask_actions.def_conder -- Ф-ция - условие для состояния достижения цели 
+	self.conder			= dtask_actions.def_conder -- Ф-ция - условие для состояния достижения цели 
 	
-	self._strTarget	= self:targetParser() -- строка: стори ИД цели
+	self._strTarget		= self:targetParser() -- строка: стори ИД цели
 	
-	local i = 0
-	self.condlist = {}
+	self.condlist 		= {}
+	
+	if task_ini:line_exist(id, "condlist") then
+		table.insert(self.condlist, xr_logic.parse_condlist(self.executor, "dynqst.DynQuest", "self.condlist", task_ini:r_string_ex(id, "condlist")) )
+	end
+	local i = 1
 	while task_ini:line_exist(id, "condlist_"..tostring(i)) do
 		table.insert(self.condlist,
 			xr_logic.parse_condlist(self.executor, "dynqst.DynQuest", "self.condlist", task_ini:r_string_ex(id, "condlist_"..tostring(i)))
 		)
 		i = i + 1
 	end
-	printf('!condlist|%s', tostring(#self.condlist))
 	return self
 end
 
@@ -90,7 +95,6 @@ function DynQuest:step(logic)
 end
 
 function DynQuest:progress(act)
-	--log ('progress|'..tostring(act))
 	if not act then return end
 		
 	if act == "complete" then	
@@ -102,8 +106,7 @@ function DynQuest:progress(act)
 		self.switcher(_, true)
 	end
 end
--- updDynQuest
--- dyn_qsts
+
 function DynQuest:update(binder) 	
 	if not self then return abort("dynqst:70") end
 
@@ -121,41 +124,69 @@ function DynQuest:update(binder)
 	end
 end
 
-function DynQuest:set_state()
-	db.storage[self.executor:id()].currDynQuest = self 
-	self.switcher = self:setLogic()
-	
-	local bind = self.executor:binded_object()
-	bind.updDynQuest = function(binder)
-		return self:update(binder)
-	end
-end
-
-function DynQuest:setLogic()  
-	local npc_id = self.executor
-	
+function DynQuest:set_state() 
+	local npc_id = self.executor:id()
 	if not db.storage[npc_id] then
 		db.storage[npc_id] = {}
 	end
 
-	if db.storage[npc_id].active_scheme then
-		xr_logic.issue_event(self.executor, db.storage[npc_id][db.storage[npc_id].active_scheme], "deactivate", self.executor)
+	local bind = self.executor:binded_object()
+	bind.updDynQuest = function(binder)
+		return self:update(binder)
 	end
+	db.storage[npc_id].currDynQuest = self
 	
-	if db.storage[npc_id].overrides then
-		db.storage[npc_id].overrides = nil
-	end
+	self.switcher = self:setLogic()
+end
 
-	local scheme, section, filename = "pointer", "pointer", 'xr_mytest'
-	db.storage[npc_id].overrides = nil
+function DynQuest:shutdown()
+	local bind = self.executor:binded_object()
+	bind.updDynQuest = function() end
+	
+	db.storage[self.executor:id()].currDynQuest = nil
+end
+
+local scheme, section, filename = "pointer", "pointer", 'xr_targeter'
+
+function DynQuest:deactivateScheme(st)
+	--************************************************* part code from xr_logic.switch_to_section
+	local npc_id = self.executor:id()
+	
+	if (axr_beh) then utils.save_var(self.executor, "path_index",1) end
+
+	st = st or db.storage[npc_id]["pointer"] -- моё 
+	xr_logic.issue_event(self.executor, st, "deactivate", self.executor, st)
+	
+	db.storage[npc_id].exit_from_smartcover_initialized = nil
+	db.storage[npc_id].active_section = nil
+	db.storage[npc_id].active_scheme = nil
+	
+	return true
+end
+
+function DynQuest:setLogic()  
+	local npc_id = self.executor:id()
+	
+	self:deactivateScheme()
+	--************************************************ part code from xr_logic.activate_by_section
 	db.storage[npc_id].activation_time = time_global()
 	db.storage[npc_id].activation_game_time = game.get_game_time()
-	local a = _G[filename].set_scheme(self.executor, self.employer, self)
+
+	-- Сбросить общие схемы:
+	xr_logic.reset_generic_schemes_on_scheme_switch(self.executor, scheme, section)
+
+	local logicCallback = _G[filename].set_scheme(self.executor, sim:object(self.currentTargetId), self)
 
 	db.storage[npc_id].active_section = section
 	db.storage[npc_id].active_scheme = scheme
-	
+
+	-- чтобы избежать дальнейшего движения по пути при установке рестрикторов
+	self.executor:inactualize_patrol_path() -- Alundaio: Necessary to clear path data or self.executor can get stuck on generic schemes
+	self.executor:set_path_type(game_object.level_path)
+	utils.send_to_nearest_accessible_vertex(self.executor, self.executor:level_vertex_id(), "dynqst.DynQuest:setLogic")
+
 	xr_logic.issue_event(self.executor, db.storage[npc_id][scheme], "activate_scheme", false, self.executor)
-	return a
+
+	return logicCallback
 end
 

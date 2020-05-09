@@ -6,8 +6,8 @@ function rtrue()
 	return true
 end
 
-function complete(dqobj)
-	dqobj:progress('complete')
+function complete(dynQuest)
+	dynQuest:progress('complete')
 	return true
 end
 
@@ -29,4 +29,10 @@ end
 
 function myconder(_, lgk)
 	return lgk.st.purpose.position:distance_to_sqr(lgk.object:position()) < 9
+end
+
+function transfer(dynQuest)
+	dynQuest.executor:transfer_item(level.object_by_id(dynQuest.subject.id), level.object_by_id(dynQuest.employer.id))
+	dynQuest:progress('complete')
+	return true
 end
