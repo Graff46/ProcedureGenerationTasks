@@ -18,13 +18,17 @@ function go_target:initialize()
 	log("# go_target:initialize")
 	
 	self.lastPos = self.st.purpose.position
+	return self:goner() 
 end
 
 function go_target:goner()
 	self.st.dqAnim = false
 	self.object:set_desired_position()
+	self.object:set_desired_direction()
 	
-	self.object:inactualize_patrol_path		()
+	self.object:clear_animations()
+	
+	self.object:inactualize_patrol_path()
 	
 	self.object:set_desired_direction()
 	self.object:inactualize_patrol_path()
@@ -37,7 +41,7 @@ function go_target:goner()
 	self.object:set_sight(look.path_dir, nil, 0)
 	state_mgr.set_state (self.object, "run")
 	
-	self:get_path()
+	return self:get_path()
 end
 
 function go_target:get_path()
@@ -45,7 +49,6 @@ function go_target:get_path()
 	if game_graph():vertex(self.st.purpose.m_game_vertex_id):level_id() == game_graph():vertex(self.object:game_vertex_id()):level_id() then
 		self.object:set_path_type(game_object.level_path)
 		utils.send_to_nearest_accessible_vertex(self.object, self.st.purpose.m_level_vertex_id, "xr_targeter")
-		self.object:set_desired_position(self.st.purpose.position)
 	else
 		self.object:set_dest_game_vertex_id ( self.st.purpose.m_game_vertex_id)
 		self.object:set_path_type ( game_object.game_path )
@@ -62,13 +65,11 @@ function go_target:anim_end()
 end
 
 function go_target:activate_scheme()
-	log("# go_target.activate_scheme")
-	return self:goner() 
+	--log("# go_target.activate_scheme")
 end
 
 function go_target:reset_scheme()
-	log("# go_target.reset_scheme")
-	
+	--log("# go_target.reset_scheme")
 end
 
 function go_target:anim()
@@ -82,7 +83,6 @@ function go_target:anim()
 end
 
 function go_target:execute()
-	log "~ go_target:execute"
 	action_base.execute(self)
 	
 	if self.st.purpose then
@@ -107,6 +107,11 @@ function go_target:execute()
 	end
 end
 
+function go_target:finalize()
+    action_base.finalize(self)
+    log("# go_target:finalize")
+end
+
 class "need" (property_evaluator)
 
 function need:__init(storage, name, npc, dynQuest) super(nil, name)
@@ -118,51 +123,42 @@ function need:evaluate()
 	return self.store.currDynQuest == self.dynQuest 
 end
 
-class "on_need_point" (property_evaluator)
-
-function on_need_point:__init(storage, name, npc) super(nil, name)
-	self.st = storage
-	self.object = npc
-end
-
-function on_need_point:evaluate()
-	return (self.st.purpose) and (self.st.purpose.position:distance_to_sqr(self.object:position()) < 2) or false
-end
-
 function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
 	log("# add_to_binder")
 	local operators	= {}
-	local properties  = {}
+	local properties = {}
 
 	local manager = npc:motivation_action_manager()
 	
-	operators["action_targeter"] = xr_evaluators_id.zmey_remark_base + 2
+	operators["action_targeter"] = xr_actions_id.zmey_remark_base + 2 -- 
 	
-	properties["needed"] = xr_actions_id.zmey_remark_base + 4
-	properties["at_point"] = xr_actions_id.zmey_remark_base + 5
-	properties["anim_end"] = xr_actions_id.zmey_remark_base + 6
-	properties["state_mgr_logic_active"] = xr_evaluators_id.state_mgr + 4
-	-- evaluators
-	
-	manager:add_evaluator(properties["needed"], this.need(storage, "has_uniq_uniq", npc, dynQuest)) -- exist task on NPC
-	manager:add_evaluator(properties["at_point"], this.on_need_point(storage, "on_need_point_uniq", npc)) -- distance to target < 2
+	properties["needed"] = xr_evaluators_id.zmey_remark_base + 4
+	properties["at_point"] = xr_evaluators_id.zmey_remark_base + 5
+	properties["anim_end"] = xr_evaluators_id.zmey_remark_base + 6
 
-	local new_action = this.go_target(npc, "go_target_uniq", storage, dynQuest)
+	-- evaluators
+	manager:add_evaluator(properties["needed"], need(storage, "need", npc, dynQuest)) -- exist task on NPC
+
+	local new_action = this.go_target(npc, "go_target", storage, dynQuest)
 	new_action:add_precondition(world_property(stalker_ids.property_alive, true))
 	new_action:add_precondition(world_property(stalker_ids.property_danger, false))
 	new_action:add_precondition(world_property(stalker_ids.property_enemy, false))
 	new_action:add_precondition(world_property(stalker_ids.property_anomaly, false))
 	
 	new_action:add_precondition(world_property(properties["needed"], true))
-	modules.add_common_precondition(scheme, new_action)
+	--modules.add_common_precondition(scheme, new_action)
 	new_action:add_effect (world_property(properties["needed"], false))
-	new_action:add_effect (world_property(properties["state_mgr_logic_active"], false))
+
 	manager:add_action(operators["action_targeter"], new_action)
 	
 	-- Зарегистрировать все actions, в которых должен быть вызван метод reset_scheme при изменении настроек схемы:
 	xr_logic.subscribe_action_for_events(npc, storage, new_action)
 
 	new_action = manager:action(xr_actions_id.alife)
+	new_action:add_precondition(world_property(properties["needed"], false))
+	new_action = manager:action(stalker_ids.action_combat_planner)
+	new_action:add_precondition(world_property(properties["needed"], false))
+	new_action = manager:action(stalker_ids.action_danger_planner)
 	new_action:add_precondition(world_property(properties["needed"], false))
 end
 
@@ -196,7 +192,7 @@ function set_scheme(npc, target, dynQuest)
 	st.purpose = target
 	st.finish = false
 	
-	return function (newPurposeId, finish) -- dynqst.DynQuest.switcher
+	return function (newPurposeId, finish) -- dynqst.DynQuest.switcher 
 		if finish then
 			st.finish = true
 			log("# finish")

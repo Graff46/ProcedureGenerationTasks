@@ -68,7 +68,7 @@ function test(aa)
 			stpk_utils.set_stalker_data(pk, npc)
 		end	
 		
-		return  nt.spawn('zat_b40_notebook', vector():set(31.442949, -0.023743, -4.539495), 226391, 1013), npc
+		return  nt.spawn('zat_b40_notebook', vector():set(-3.509130, 7.498052, 14.318340), 195557, 1026), npc
 	end
 	
 	if aa then
