@@ -61,7 +61,6 @@ do
 		end
 
 		hndlr, conder = 'rtrue', 'def_conder'
-		targetStoryId
 		
 		if string.find(strTarget, "|") then 
 			targetStoryId, hndlr = string.match(strTarget, "(.+)[|](.+)")
