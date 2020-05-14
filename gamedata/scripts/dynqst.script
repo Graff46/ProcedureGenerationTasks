@@ -29,7 +29,7 @@ function DynQuest:__init(id, executor, employer, subject)
 	self.currAction		= dtask_actions.rtrue  -- ф-ция которая выполнится если условие достижения цели выполнено, должно возвратить true чтобы учесть дейтвие выполненным и разрешить переключение на следующие цели (сделать шаг)
 	self.conder			= dtask_actions.def_conder -- Ф-ция - условие для состояния достижения цели 
 	
-	self._strTarget		= self:targetParser() -- строка: стори ИД цели
+	self._strTarget, self.currentTargetId = self:targetParser() -- строка: стори ИД цели
 	
 	self.condlist 		= {}
 	
@@ -46,38 +46,40 @@ function DynQuest:__init(id, executor, employer, subject)
 	return self
 end
 
-function DynQuest:targetParser()
-	if self.mystate == 0 then
-		self.currentTargetId = self.employer.id
-		return self.currentTargetId
-	end
-	
-	local strTarget = xr_logic.pick_section_from_condlist(db.actor, self.executor, self.target) -- Парсятся цели из строки {+infp -infp =fun !fun} section %+infp -infp =fun%
-	if self._strTarget == strTarget then
-		return strTarget
-	end
-		
-	self._strTarget = strTarget
-	local hndlr, conder = 'rtrue', 'def_conder'
-	local targetStoryId
-	
-	if string.find(self._strTarget, "|") then 
-		targetStoryId, hndlr = string.match(self._strTarget, "(.+)[|](.+)")
-		
-		if string.find(targetStoryId, "|") then
-			targetStoryId, conder = string.match(targetStoryId, "(.+)[|](.+)")
+do
+	local strTarget, hndlr, conder, targetStoryId
+	function DynQuest:targetParser()
+		if self.mystate == 0 then
+			self.currentTargetId = self.employer.id
+			return "", self.currentTargetId
 		end
+		
+		strTarget = xr_logic.pick_section_from_condlist(db.actor, self.executor, self.target) -- Парсятся цели из строки {+infp -infp =fun !fun} section %+infp -infp =fun%
+
+		if self._strTarget == strTarget then
+			return strTarget, self.currentTargetId
+		end
+
+		hndlr, conder = 'rtrue', 'def_conder'
+		
+		if string.find(strTarget, "|") then 
+			targetStoryId, hndlr = string.match(strTarget, "(.+)[|](.+)")
+			
+			if string.find(targetStoryId, "|") then
+				targetStoryId, conder = string.match(targetStoryId, "(.+)[|](.+)")
+			end
+		end
+		 
+		self.currAction = dtask_actions[hndlr]
+		self.conder = dtask_actions[conder]
+		
+		return targetStoryId, get_story_object_id(targetStoryId)
 	end
-	 
-	self.currAction = dtask_actions[hndlr]
-	self.conder = dtask_actions[conder]
-	
-	self.currentTargetId = get_story_object_id(targetStoryId)
-	return targetStoryId
 end
 
-function DynQuest:changeTarget (id)
+function DynQuest:changeTarget (id, str)
 	self.currentTargetId = id
+	self._strTarget = str
 	self.switcher(self.currentTargetId)
 end
 
@@ -89,7 +91,6 @@ function DynQuest:step(logic)
 			self.mystate = self.mystate + 1
 		end 
 	else
-		self.switcher(self.currentTargetId) 
 		self.mystate = self.mystate + 1
 	end
 end
@@ -107,20 +108,23 @@ function DynQuest:progress(act)
 	end
 end
 
-function DynQuest:update(binder) 	
-	if not self then return abort("dynqst:70") end
+do
+	local str_targetSid, targetId
+	function DynQuest:update(binder) 	
+		if not self then return abort("dynqst:70") end
 
-	local t_target = self:targetParser()
-	if not t_target then
-		return abort("DynQst: new target parsing as nil!") 
-	end
-	
-	if self.currentTargetId ~= t_target then
-		self:changeTarget(self.currentTargetId) 
-	end
+		str_targetSid, targetId = self:targetParser()
+		if not (str_targetSid and targetId) then
+			return abort("DynQst: new target parsing as nil!") 
+		end
+		
+		if self._strTarget ~= str_target then
+			self:changeTarget(targetId, str_targetSid) 
+		end
 
-	for i=1, #self.condlist do
-		self:progress( xr_logic.pick_section_from_condlist(db.actor, self.executor, self.condlist[i]) )
+		for i=1, #self.condlist do
+			self:progress( xr_logic.pick_section_from_condlist(db.actor, self.executor, self.condlist[i]) )
+		end
 	end
 end
 
@@ -134,6 +138,7 @@ function DynQuest:set_state()
 	bind.updDynQuest = function(binder)
 		return self:update(binder)
 	end
+	
 	db.storage[npc_id].currDynQuest = self
 	
 	self.switcher = self:setLogic()
@@ -181,9 +186,9 @@ function DynQuest:setLogic()
 	db.storage[npc_id].active_scheme = scheme
 
 	-- чтобы избежать дальнейшего движения по пути при установке рестрикторов
-	self.executor:inactualize_patrol_path() -- Alundaio: Necessary to clear path data or self.executor can get stuck on generic schemes
-	self.executor:set_path_type(game_object.level_path)
-	utils.send_to_nearest_accessible_vertex(self.executor, self.executor:level_vertex_id(), "dynqst.DynQuest:setLogic")
+	--self.executor:inactualize_patrol_path() -- Alundaio: Necessary to clear path data or self.executor can get stuck on generic schemes
+	--self.executor:set_path_type(game_object.level_path)
+	--utils.send_to_nearest_accessible_vertex(self.executor, self.executor:level_vertex_id(), "dynqst.DynQuest:setLogic")
 
 	xr_logic.issue_event(self.executor, db.storage[npc_id][scheme], "activate_scheme", false, self.executor)
 
