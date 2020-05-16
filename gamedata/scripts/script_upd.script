@@ -1,19 +1,22 @@
 local print = function(x) return log("@ "..tostring(x)) end
 
 local pos = db.actor:position()
---local lv, gv = db.actor:level_vertex_id(), db.actor:game_vertex_id()
---pos.x = pos.x + 1.5 
+local lv, gv = db.actor:level_vertex_id(), db.actor:game_vertex_id()
+pos.x = pos.x + 1
 
 local aa = level.get_target_obj() 
 
 
-print(db.storage[aa:id()].active_section)
---print(not not db.storage[aa:id()].currDynQuest)
-
-local b = aa:motivation_action_manager()
-print(b:current_action_id())
---print(type( b.actual ))
-
+--print(db.storage[aa:id()].active_section)
+----print(not not db.storage[aa:id()].currDynQuest)
+--
+--local b = aa:motivation_action_manager()
+--print(b:current_action_id())
+if aa then
+	print(not not alife():object(aa:id()).dynQuest)
+else
+	alife():create("stalker", pos, lv, gv).dynQuest = true
+end
 
 
 

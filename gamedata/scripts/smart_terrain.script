@@ -306,7 +306,8 @@ end
 function se_smart_terrain:register_npc(obj)
 	--alun_utils.debug_write(strformat("%s:%s:register_npc %s",self:name(),self.id,obj and obj:name()))
 	-- ensure registration is clean
-	if (self.arriving_npc[obj.id] or self.npc_info[obj.id]) then
+	log("~ register_npc"..tostring(not not obj.dynQuest))
+	if (self.arriving_npc[obj.id] or self.npc_info[obj.id] or obj.dynQuest) then
 		--self.arriving_npc[obj.id] = nil
 		--self:clear_job(obj.id,true)
 		return
@@ -1319,9 +1320,6 @@ end
 
 function se_smart_terrain:setup_logic(npc)
 	--alun_utils.debug_write(self:name().." setup_logic "..tostring(npc and npc:name()))
-	if not db.storage[npc:id()].curr_qsts then
-		return printf("%s.setup_logic: NPC in dyn_qest", self:name())
-	end
 	
 	if not (npc) then
 		printf("%s.setup_logic: NPC is nil",self:name())

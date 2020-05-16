@@ -156,10 +156,6 @@ function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
 
 	new_action = manager:action(xr_actions_id.alife)
 	new_action:add_precondition(world_property(properties["needed"], false))
-	new_action = manager:action(stalker_ids.action_combat_planner)
-	new_action:add_precondition(world_property(properties["needed"], false))
-	new_action = manager:action(stalker_ids.action_danger_planner)
-	new_action:add_precondition(world_property(properties["needed"], false))
 end
 
 function set_scheme(npc, target, dynQuest)
