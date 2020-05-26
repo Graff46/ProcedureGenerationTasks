@@ -114,11 +114,12 @@ class "need" (property_evaluator)
 
 function need:__init(storage, name, npc, dynQuest) super(nil, name)
 	self.dynQuest = dynQuest
-	self.store = db.storage[npc:id()]
+	self.store = dynqst.db[npc:id()] --db.storage[npc:id()]
 end
 
 function need:evaluate()
-	return self.store.currDynQuest == self.dynQuest 
+	--return self.store.currDynQuest == self.dynQuest 
+	return self.store = self.dynQuest 
 end
 
 function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
@@ -154,6 +155,24 @@ function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
 
 	new_action = manager:action(xr_actions_id.alife)
 	new_action:add_precondition(world_property(properties["needed"], false))
+end
+
+class "offliner"
+
+function offliner:set_behavor ()
+	sobj.offline_moved = true
+	local brain = sobj:brain()
+	brain:can_choose_alife_tasks(false)
+	local movement_mgr = brain:movement()
+	movement_mgr:path_type(game_object.game_path) 
+	local detail_mgr = movement_mgr:detail()
+	local my_task = CALifeSmartTerrainTask(209, 1154054)
+	detail_mgr:target(209, 1154054, vector():set(109.051163, -6.774208, 166.492569))
+	brain:update()
+end
+
+function onOffline(sobj)
+	_G.Sobj.m_smart_terrain_id = get_story_object_id('zat_stalker_base_smart')
 end
 
 function set_scheme(npc, target, dynQuest)
@@ -199,4 +218,6 @@ function set_scheme(npc, target, dynQuest)
 		end
 	end
 end
+
+
 

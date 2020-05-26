@@ -4,32 +4,52 @@ local pos = db.actor:position()
 local lv, gv = db.actor:level_vertex_id(), db.actor:game_vertex_id()
 pos.x = pos.x + 1
 
-local sim = alife()
+
 local aa = level.get_target_obj() 
 
 
 --print(db.storage[aa:id()].active_section)
-----print(not not db.storage[aa:id()].currDynQuest)
---
+----sim:teleport_object(_G.hhh)
 
+local sim = alife()
 if aa then
 	sim:set_switch_online  (aa:id (), false)
     sim:set_switch_offline (aa:id (), true)
+	log("offln")
 else	
-	local sobj = sim:create("stalker", pos, lv, gv)
-	sobj.dynQuest = true
-	level.map_add_object_spot_ser(sobj.id,"green_location", desc or "Цель12")
+	if false then
+		--local sobj = _G.Sobj
+		--
+		--sobj.offline_moved = true
+		--local brain = sobj:brain()
+		--brain:can_choose_alife_tasks(false)
+		--local movement_mgr = brain:movement()
+		--movement_mgr:path_type(game_object.game_path) 
+		--local detail_mgr = movement_mgr:detail()
+		--local my_task = CALifeSmartTerrainTask(209, 1154054)
+		--detail_mgr:target(209, 1154054, vector():set(109.051163, -6.774208, 166.492569))
+		--brain:update()
+		--print('movement_mgr:path_type()')
+	else
+		--local a
+		--for i=1, 65535 do
+		--	a = sim:object(i)
+		--	if a and a.g_group then
+		--		sim:release(a, true)
+		--	end
+		--end
 	
-	local brain = sobj:brain()
-	brain:can_choose_alife_tasks(true)
-	local movement_mgr = brain:movement()
-	brain:update()
-	--movement_mgr:path_type(0)
-	local detail_mgr = movement_mgr:detail()
-	local my_task = CALifeSmartTerrainTask(452, 80264)
-	detail_mgr:target(my_task)
-    brain:update()
+		--
+	_G.Sobj = sim:create("stalker", pos, lv, gv)
+	_G.Sobj.dynQuest = true
+	level.map_add_object_spot_ser(_G.Sobj.id, "green_location", "????12")
+	_G.Sobj.m_smart_terrain_id = get_story_object_id('zat_stalker_base_smart')
+	
+	print(15)
+	end
 end
+
+
 
 
 

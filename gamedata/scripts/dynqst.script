@@ -1,5 +1,7 @@
 local sim = alife()
 
+db = {}
+
 class "DynQuest" 
 
 --[[ --TODO
@@ -110,7 +112,7 @@ end
 
 do
 	local str_targetSid, targetId
-	function DynQuest:update(binder) 	
+	function DynQuest:update() 	
 		if not self then return abort("dynqst:70") end
 
 		str_targetSid, targetId = self:targetParser()
@@ -136,10 +138,11 @@ function DynQuest:set_state()
 
 	local bind = self.executor:binded_object()
 	bind.updDynQuest = function(binder)
-		return self:update(binder)
+		return self:update()
 	end
 	
-	db.storage[npc_id].currDynQuest = self
+	--db.storage[].currDynQuest = self
+	dynqst.db[npc_id] = self
 	
 	self.switcher = self:setLogic()
 end
@@ -148,7 +151,8 @@ function DynQuest:shutdown()
 	local bind = self.executor:binded_object()
 	bind.updDynQuest = function() end
 	
-	db.storage[self.executor:id()].currDynQuest = nil
+	--db.storage[self.executor:id()].currDynQuest = nil
+	dynqst.db[npc_id] = nil
 end
 
 local scheme, section, filename = "pointer", "pointer", 'xr_targeter'
@@ -167,6 +171,10 @@ function DynQuest:deactivateScheme(st)
 	db.storage[npc_id].active_scheme = nil
 	
 	return true
+end
+
+function DynQuest:toOffline(sobj)
+	return xr_targeter.onOffline(sobj)
 end
 
 function DynQuest:setLogic()  
@@ -193,5 +201,16 @@ function DynQuest:setLogic()
 	xr_logic.issue_event(self.executor, db.storage[npc_id][scheme], "activate_scheme", false, self.executor)
 
 	return logicCallback
+end
+
+--**************************************************************************************************************************--
+--**************************************************************************************************************************--
+
+function Load(reader)
+	local dybQuest = reader:r_stringZ()
+end
+
+function Save(packet, dybQuest)
+	return packet:w_stringZ(dybQuest)
 end
 
