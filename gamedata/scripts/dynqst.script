@@ -26,7 +26,7 @@ function DynQuest:__init(id, executor, employer, subject)
 	self.mystate		= 0
 	self.switcher		= false
 		
-	self.currAction		= dtask_actions.rtrue  -- ф-ция которая выполнится если условие достижения цели выполнено, должно возвратить true чтобы учесть дейтвие выполненным и разрешить переключение на следующие цели (сделать шаг)
+	self.effector		= dtask_actions.rtrue  -- ф-ция которая выполнится если условие достижения цели выполнено, должно возвратить true чтобы учесть дейтвие выполненным и разрешить переключение на следующие цели (сделать шаг)
 	self.conder			= dtask_actions.def_conder -- Ф-ция - условие для состояния достижения цели 
 	
 	self._strTarget, self.currentTargetId = self:targetParser() -- строка: стори ИД цели
@@ -47,7 +47,7 @@ function DynQuest:__init(id, executor, employer, subject)
 end
 
 do
-	local strTarget, hndlr, conder, targetStoryId
+	local strTarget, effector, conder, targetStoryId
 	function DynQuest:targetParser()
 		if self.mystate == 0 then
 			self.currentTargetId = self.employer.id
@@ -60,17 +60,17 @@ do
 			return strTarget, self.currentTargetId
 		end
 
-		hndlr, conder = 'rtrue', 'def_conder'
+		effector, conder = 'rtrue', 'def_conder'
 		
 		if string.find(strTarget, "|") then 
-			targetStoryId, hndlr = string.match(strTarget, "(.+)[|](.+)")
+			targetStoryId, effector = string.match(strTarget, "(.+)[|](.+)")
 			
 			if string.find(targetStoryId, "|") then
 				targetStoryId, conder = string.match(targetStoryId, "(.+)[|](.+)")
 			end
 		end
 		 
-		self.currAction = dtask_actions[hndlr]
+		self.effector = dtask_actions[effector]
 		self.conder = dtask_actions[conder]
 		
 		return targetStoryId, get_story_object_id(targetStoryId)
@@ -87,7 +87,7 @@ function DynQuest:step(logic)
 	log("~STEP|"..tostring(self.mystate))
 	
 	if self.mystate > 0 then 
-		if self:currAction() then 
+		if self:effector() then 
 			self.mystate = self.mystate + 1
 		end 
 	else

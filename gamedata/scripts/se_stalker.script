@@ -31,6 +31,7 @@ function se_stalker:switch_online()
 end
 
 function se_stalker:switch_offline()
+	log("# se_stalker:switch_offline "..tostring(self.id))
 	cse_alife_human_stalker.switch_offline(self)
 end
 

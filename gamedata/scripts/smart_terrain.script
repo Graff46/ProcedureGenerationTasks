@@ -306,7 +306,6 @@ end
 function se_smart_terrain:register_npc(obj)
 	--alun_utils.debug_write(strformat("%s:%s:register_npc %s",self:name(),self.id,obj and obj:name()))
 	-- ensure registration is clean
-	log("~ register_npc"..tostring(not not obj.dynQuest))
 	if (self.arriving_npc[obj.id] or self.npc_info[obj.id] or obj.dynQuest) then
 		--self.arriving_npc[obj.id] = nil
 		--self:clear_job(obj.id,true)
