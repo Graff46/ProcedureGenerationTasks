@@ -182,10 +182,13 @@ function set_scheme(npc, target, dynQuest)
 	st.section = "pointer"
 	st.ini = ini
 	
-	xr_offliner.event.swithOffline = function (sobj)
+	local _oldFunc = xr_offliner.onOffline
+	
+	xr_offliner.onOffline = function(sobj)
 		if sobj.id == npc:id() then
-			return xr_targeter.Offline(sobj)
+			 xr_targeter.Offline(sobj)
 		end
+		return _oldFunc(sobj)
 	end
 end
 
