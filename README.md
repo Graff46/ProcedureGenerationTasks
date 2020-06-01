@@ -38,4 +38,4 @@
 </details>
 <a href="https://youtu.be/otGTh_2ASr0" target="_blank">Видео пример</a>
 
-#### Ставиться на Call of Chernobyl 1.4.12
+#### Платформа Зов Припяти (рекомендуется Mixed сборка [OpenXRay](https://github.com/OpenXRay/xray-16))
