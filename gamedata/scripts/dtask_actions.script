@@ -11,28 +11,7 @@ function complete(dynQuest)
 	return true
 end
 
-function take_obj(dynQuest)
-	log("~ACT") 
-	local obj, npc = level.object_by_id(dynQuest.currentTargetId), dynQuest.executor
-	if obj then
-		obj:transfer_item(obj, npc)
-		return true
-	else
-		return false
-	end
-	return true
-end 
-
-function def_conder(_, lgk)
-	return lgk.st.purpose.position:distance_to_sqr(lgk.object:position()) < 2
+function def_conder(dynQuest, lgk)
+	return dynQuest.purpose.position:distance_to_sqr(dynQuest.executor.position) < 2 
 end
 
-function myconder(_, lgk)
-	return lgk.st.purpose.position:distance_to_sqr(lgk.object:position()) < 9
-end
-
-function transfer(dynQuest)
-	dynQuest.executor:transfer_item(level.object_by_id(dynQuest.subject.id), level.object_by_id(dynQuest.employer.id))
-	dynQuest:progress('complete')
-	return true
-end
