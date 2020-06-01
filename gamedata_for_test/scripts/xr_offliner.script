@@ -4,8 +4,6 @@
 -- Схема управления поведением НПС в оффлайне
 --************************--
 
-function noop() end
-
 local smartStoryID = 'zat_stalker_base_smart'
 
 class "offliner"
@@ -36,10 +34,10 @@ function offliner:__init(sobj)
 end
 
 function offliner:shutdown()
+	self.object.m_smart_terrain_id = 65535
+	
 	self.object.offline_targets = nil
 	self.object.offline_behavior = nil
-	
-	self.object.m_smart_terrain_id = 65535
 end
 
 function offliner:setTargetVertices(level_vertex, game_vertex)
@@ -63,7 +61,7 @@ function offliner:onOnline()
 		db.offline_objects[self.object.id] = nil
 	end
 	
-	return self:shutdown(self)
+	return self:shutdown()
 end
 
 function offliner:callEvent(eventName)
@@ -148,9 +146,6 @@ function parse(se_obj)
 	end
 end
 
-event = {swithOffline = noop}
-
 function onOffline(se_npc)
-	event.swithOffline(se_npc)
 	return xr_offliner.parse(se_npc)
 end
