@@ -1,11 +1,12 @@
-local var
+
 function start()
-	if not level.present() or (db.actor == nil) or not db.actor:alive() then
+	if not level.present() or (not db.actor) or not db.actor:alive() then
 		return
 	end
+	
 	get_console():execute("main_menu off")
 	var = posinf46.PosInf46UI()
-	var:ShowDialog()
+	var:ShowDialog(true)
 end
 
 local function vec3Str(v)
@@ -28,6 +29,8 @@ function PosInf46UI:__finalize()
 end
 
 function PosInf46UI:InitControls()
+	self:SetWndPos			(vector2():set(0,0))
+	self:SetWndSize			(vector2():set(1024,768))
 	local xml = CScriptXmlInit()
 	self:SetWndRect					(Frect():set(0,0,1024,768))
 	xml:ParseFile("posinf46ui.xml")
@@ -48,6 +51,7 @@ function PosInf46UI:InitControls()
 	self.path_name = xml:InitEditBox("frame:path_name", self.frame)
 	self:Register(xml:Init3tButton("frame:btn_crt_path", self.frame), "btn_crt_path")
 	
+	--
 	self.message_box = CUIMessageBoxEx()
     self:Register(self.message_box, "msg_box")
 end
@@ -63,9 +67,7 @@ function PosInf46UI:InitCallBacks()
 	self:AddCallback("btn_tofile", ui_events.BUTTON_CLICKED, self.btn_tofile_button_clicked, self)
 	self:AddCallback("btn_crt_path", ui_events.BUTTON_CLICKED, self.btn_crt_path_button_clicked, self)
 	self:AddCallback("btn_clrfile", ui_events.BUTTON_CLICKED, self.btn_clear_file, self)
-	
-	self.listing:SetText(posex_mng.rdFile() )
-	get_console():execute(type(self.listing))
+	self.listing:SetText(tostring(posex_mng.rdFile() ) )
 	self:Calc()
 end
 
@@ -92,7 +94,7 @@ end
 
 
 function PosInf46UI:listing_SetText(txt)    
-	self.listing:SetText(txt or "")
+	self.listing:SetText(tostring(txt) or "")
 end
 
 function PosInf46UI:listing_GetText(txt)    
@@ -200,10 +202,11 @@ function PosInf46UI:OnKeyboard(dik, keyboard_action)
 	CUIScriptWnd.OnKeyboard(self,dik,keyboard_action)
 	
 	if keyboard_action == ui_events.WINDOW_KEY_PRESSED then
-		if (dik == DIK_keys.DIK_ESCAPE) then
-			var:HideDialog()
+		if dik == DIK_keys.DIK_ESCAPE then
+			self:HideDialog()
 		end
 	end
+	return true
 end
 
 

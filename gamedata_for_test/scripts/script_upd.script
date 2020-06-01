@@ -1,0 +1,44 @@
+local print = function(x) return log("! "..tostring(x)) end
+
+local pos = db.actor:position()
+local lv, gv = db.actor:level_vertex_id(), db.actor:game_vertex_id()
+pos.x = pos.x + 1
+
+
+local aa = level.get_target_obj() 
+
+local sim = alife()
+
+if _G.qqq then
+	sim:set_switch_online  (_G.Sobj.id, not _G.Sobj.online)
+	sim:set_switch_offline (_G.Sobj.id, true)
+else
+	if _G.Sobj then
+		_G.qqq = my.test(_G.Sobj)
+	else	
+	
+		_G.Sobj = sim:create("stalker", pos, lv, gv)
+		_G.Sobj.no_smart = true
+
+		level.map_add_object_spot_ser(_G.Sobj.id, "green_location", "Cell12")
+		sim:set_switch_online  (_G.Sobj.id, false)
+		sim:set_switch_offline (_G.Sobj.id, true)
+		
+		print(15)
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
