@@ -58,29 +58,32 @@ function net_spawn(binder)
 	end
 end
 
-local ii = 1
+local ii, tname = 1, {'one', 'two'}
 function test(aa)
 	function start()
-		local npc = nt.spawn('stalker', vector():set(-8.510684, 7.499130, 4.037048), 191155, 1026)
-		local pk = stpk_utils.get_stalker_data(npc)
-		if pk then
-			pk.custom_data = "[smart_terrains]\nnone = true\n\n[logic]\n cfg = logic\\test.ltx"
-			stpk_utils.set_stalker_data(pk, npc)
-		end	
+		local npc = nt.spawn('getter', vector():set(167.674072, -5.899564, 152.737625), 1253885, 184)
+		npc.no_smart = true
 		
-		return nt.spawn('zat_b40_notebook', vector():set(-3.509130, 7.498052, 14.318340), 195557, 1026), npc
+		local nout = nt.spawn('zat_b40_notebook', vector():set(111.464325, -6.839030, 167.582260), 1157622, 209)
+		sim:set_switch_online  (nout.id, false)
+		sim:set_switch_offline (nout.id, true)
+		
+		sim:set_switch_online  (npc.id, false)
+		sim:set_switch_offline (npc.id, true)
+		
+		return nout, npc
 	end
 	
 	if aa then
 		local strg, snpc = start()
 		
-		add_story_object(snpc.id, "chel"..tostring(ii)) 
-		add_story_object(strg.id, "cellnoute"..tostring(ii))
-		log("~ !Start"..tostring(ii))
+		add_story_object(snpc.id, "chel"..tostring(tname[ii])) 
+		add_story_object(strg.id, "cellnoute"..tostring(tname[ii]))
+		log("~ !Start"..tostring(tname[ii]))
 		
-		local q = dynqst.DynQuest('mynotebook'..tostring(ii), aa, snpc, strg)
-		q:set_state()
+		local q = dynqst.DynQuest('mynotebook'..tostring(tname[ii]), aa, snpc, strg)
+		q:setState()
 		ii = ii + 1
-		
+		return q
 	end 
 end
