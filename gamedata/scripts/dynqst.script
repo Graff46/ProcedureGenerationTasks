@@ -20,7 +20,7 @@ function DynQuest:__init(id, executor, employer, subject)
 	self.employer		= employer -- работодатель
 	self.keeper			= self.employer  -- храниль -и
 	self.storage		= {}  -- Хранилище свободных данных для квеста
-	self.subject		= subject  -- Субъект квеста (server object)
+	--self.subject		= subject  -- Субъект квеста (server object)
 		
 	self.step		= 0
 
@@ -161,7 +161,6 @@ function DynQuest:deactivateScheme(st)
 
 	st = st or db.storage[npc_id]["pointer"] -- моё 
 	xr_logic.issue_event(self.cexecutor, st, "deactivate", self.cexecutor, st)
-	db.storage[npc_id]["pointer"] = nil
 	
 	db.storage[npc_id].exit_from_smartcover_initialized = nil
 	db.storage[npc_id].active_section = nil
@@ -188,8 +187,10 @@ end
 
 function DynQuest:setLogic()  
 	if self.executor.online then
-		self.cexecutor = self.cexecutor or level.object_by_id(npc_id)
 		local npc_id = self.cexecutor:id()
+		if db.storage[npc_id]["pointer"] then return end
+	
+		self.cexecutor = self.cexecutor or level.object_by_id(npc_id)
 		
 		self:deactivateScheme()
 		--************************************************ part code from xr_logic.activate_by_section
@@ -206,7 +207,7 @@ function DynQuest:setLogic()
 
 		return xr_logic.issue_event(self.cexecutor, db.storage[npc_id][scheme], "activate_scheme", false, self.cexecutor)
 	else
-		xr_targeter.Offline(self.executor)
+		return xr_targeter.Offline(self.executor)
 	end
 end
 
