@@ -20,7 +20,7 @@ function DynQuest:__init(id, executor, employer, subject)
 	self.employer		= employer -- работодатель
 	self.keeper			= self.employer  -- храниль -и
 	self.storage		= {}  -- Хранилище свободных данных для квеста
-	self.subject		= subject  -- Субъект квеста (server object)
+	--self.subject		= subject  -- Субъект квеста (server object)
 		
 	self.step		= 0
 
@@ -114,7 +114,8 @@ end
 
 do
 	local str_targetSid, targetId
-	function DynQuest:update() 	log("! DynQuest:update")
+	function DynQuest:update() 
+		log("! DynQuest:update")
 		str_targetSid, targetId = self:targetParser()
 		if not (str_targetSid and targetId) then
 			return abort("DynQst: new target parsing as nil!") 
@@ -123,9 +124,13 @@ do
 		if self._strTarget ~= str_targetSid then
 			self:changeTarget(targetId, str_targetSid) 
 		end
-
+	
 		for i=1, #self.condlist do
 			self:progress( xr_logic.pick_section_from_condlist(db.actor, self.executor, self.condlist[i]) )
+		end	
+		
+		if self:conder(self) then
+			return self:nextStep()
 		end
 	end
 end
@@ -161,7 +166,6 @@ function DynQuest:deactivateScheme(st)
 
 	st = st or db.storage[npc_id]["pointer"] -- моё 
 	xr_logic.issue_event(self.cexecutor, st, "deactivate", self.cexecutor, st)
-	db.storage[npc_id]["pointer"] = nil
 	
 	db.storage[npc_id].exit_from_smartcover_initialized = nil
 	db.storage[npc_id].active_section = nil
@@ -188,8 +192,10 @@ end
 
 function DynQuest:setLogic()  
 	if self.executor.online then
-		self.cexecutor = self.cexecutor or level.object_by_id(npc_id)
 		local npc_id = self.cexecutor:id()
+		if db.storage[npc_id]["pointer"] then return end
+	
+		self.cexecutor = self.cexecutor or level.object_by_id(npc_id)
 		
 		self:deactivateScheme()
 		--************************************************ part code from xr_logic.activate_by_section
@@ -206,8 +212,12 @@ function DynQuest:setLogic()
 
 		return xr_logic.issue_event(self.cexecutor, db.storage[npc_id][scheme], "activate_scheme", false, self.cexecutor)
 	else
-		xr_targeter.Offline(self.executor)
+		return xr_targeter.Offline(self.executor)
 	end
+end
+
+function DynQuest:finalize()
+	log("! DynQuest:finalize")
 end
 
 --**************************************************************************************************************************--

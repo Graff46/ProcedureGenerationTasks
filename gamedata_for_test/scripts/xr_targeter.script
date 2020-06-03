@@ -1,14 +1,18 @@
 local sim = alife()
 
+function needPosUpdate(dynQuest, lastPorpuseLV, lastPorpuseGV)
+	return dynQuest.purpose.m_level_vertex_id ~= lastPorpuseLV or 
+	dynQuest.purpose.m_game_vertex_id ~= lastPorpuseGV
+end
+
 class "go_target" (action_base)
 
-function go_target:__init (npc, action_name, storage, dynQuest) super(nil, action_name)
+function go_target:__init (npc, action_name, storage) super(nil, action_name)
 	log("# go_target:__init")
 
 	self.st = storage
 	--self.object = npc 
 	self.sobj = sim:object(npc:id())  
-	self.dynQuest = dynQuest
 	self.parent_purpose = false
 	self.lastPos = false
 end 
@@ -45,35 +49,25 @@ end
 function go_target:get_path()
 	log("#get_path")
 	self.object:set_path_type(game_object.level_path)
-	utils.send_to_nearest_accessible_vertex(self.object, self.dynQuest.purpose.m_level_vertex_id, "xr_targeter")
+	utils.send_to_nearest_accessible_vertex(self.object, self.sobj.dynQuest.purpose.m_level_vertex_id, "xr_targeter")
 		
 	self.object:set_sight (look.path_dir, nil, 0)
 	--self.state = 0
 	state_mgr.set_state (self.object, 'run')
 	
-	log("! Tar_lv_"..tostring(self.dynQuest.purpose.m_level_vertex_id))
-	self.lastPorpuseLV = self.dynQuest.purpose.m_level_vertex_id
+	log("! Tar_lv_"..tostring(self.sobj.dynQuest.purpose.m_level_vertex_id))
+	self.lastPorpuseLV = self.sobj.dynQuest.purpose.m_level_vertex_id
+	self.lastPorpuseGV = self.sobj.dynQuest.purpose.m_game_vertex_id
 end
 
 function go_target:anim()
-	self.object:set_desired_position()
-	self.object:set_desired_direction()
-	
-	--self.state = 1
-	
-	self.dynQuest:nextStep(self)
-	log("EVENT!")
 end
 
 function go_target:execute()
 	action_base.execute(self)
 	
-	if self.dynQuest.purpose then
-		if self.dynQuest:conder(self) then
-			return self:anim()
-		elseif self.dynQuest.purpose.m_level_vertex_id ~= self.lastPorpuseLV then 
-			return self:get_path()
-		end
+	if needPosUpdate(self.sobj.dynQuest, self.lastPorpuseLV, self.lastPorpuseGV) then 
+		return self:get_path()
 	end
 end
 
@@ -84,16 +78,15 @@ end
 
 class "need" (property_evaluator)
 
-function need:__init(storage, name, npc, dynQuest) super(nil, name)
-	self.dynQuest = dynQuest
+function need:__init(storage, name, npc) super(nil, name)
 	self.sobj = sim:object(npc:id()) --db.storage[npc:id()]
 end
 
 function need:evaluate()
-	return self.sobj.dynQuest == self.dynQuest 
+	return not not self.sobj.dynQuest 
 end
 
-function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
+function add_to_binder(npc, ini, scheme, section, storage)
 	log("# add_to_binder")
 	local operators	= {}
 	local properties = {}
@@ -108,9 +101,9 @@ function add_to_binder(npc, ini, scheme, section, storage, dynQuest)
 	properties["state_mgr_logic_active"] = xr_evaluators_id.state_mgr + 4
 
 	-- evaluators
-	manager:add_evaluator(properties["needed"], need(storage, "need", npc, dynQuest)) -- exist task on NPC
-
-	local new_action = this.go_target(npc, "go_target", storage, dynQuest)
+	manager:add_evaluator(properties["needed"], need(storage, "need", npc)) -- exist task on NPC
+	
+	local new_action = this.go_target(npc, "go_target", storage)
 	new_action:add_precondition(world_property(stalker_ids.property_alive, true))
 	new_action:add_precondition(world_property(stalker_ids.property_danger, false))
 	new_action:add_precondition(world_property(stalker_ids.property_enemy, false))
@@ -136,31 +129,26 @@ function Offline:__init(sobj)
 	super(sobj)
 	
 	self.dynQuest = sobj.dynQuest
+	self.sobj = sobj
 	self:checkTarget()
 end
 
 function Offline:checkTarget()
-	if self.dynQuest.purpose.m_level_vertex_id ~= self.lastLV or self.dynQuest.purpose.m_game_vertex_id ~= self.lastGV then
-		log("! rt_"..tostring(self.dynQuest.purpose:name()))
-		self:setTargetVertices(self.dynQuest.purpose.m_level_vertex_id, self.dynQuest.purpose.m_game_vertex_id)
-		self.lastLV = self.dynQuest.purpose.m_level_vertex_id
-		self.lastGV = self.dynQuest.purpose.m_game_vertex_id
-	end
+	self.lastLV = self.sobj.dynQuest.purpose.m_level_vertex_id
+	self.lastGV = self.sobj.dynQuest.purpose.m_game_vertex_id
+	
+	self:setTargetVertices(self.lastLV, self.lastGV)
 end
 
 function Offline:update()
-	self.dynQuest:update()
+	self.sobj.dynQuest:update()
 	
-	if self.dynQuest.purpose.m_game_vertex_id == self.object.m_game_vertex_id and
-	self.dynQuest.purpose.m_level_vertex_id == self.object.m_level_vertex_id then
-		self.dynQuest:nextStep(self)
-		log("EVENT!")
+	if needPosUpdate(self.sobj.dynQuest, self.lastLV, self.lastGV) then
+		return self:checkTarget()
 	end
-	
-	return self:checkTarget() 
 end
 
-function set_scheme(npc, target, dynQuest)
+function set_scheme(npc, target)
 	xr_logic.reset_generic_schemes_on_scheme_switch(npc, 'pointer', 'pointer')
 	
 	local id = npc:id()	
@@ -177,7 +165,7 @@ function set_scheme(npc, target, dynQuest)
 	st.npc = npc
 	st.logic = {}
 	
-	add_to_binder(npc, ini, "pointer", 'pointer', st, dynQuest)
+	add_to_binder(npc, ini, "pointer", 'pointer', st)
 
 	st.section = "pointer"
 	st.ini = ini
@@ -186,7 +174,7 @@ function set_scheme(npc, target, dynQuest)
 	
 	xr_offliner.onOffline = function(sobj)
 		if sobj.id == npc:id() then
-			 xr_targeter.Offline(sobj)
+			return xr_targeter.Offline(sobj)
 		end
 		return _oldFunc(sobj)
 	end
