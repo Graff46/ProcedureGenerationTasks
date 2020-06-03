@@ -114,7 +114,8 @@ end
 
 do
 	local str_targetSid, targetId
-	function DynQuest:update() 	log("! DynQuest:update")
+	function DynQuest:update() 
+		log("! DynQuest:update")
 		str_targetSid, targetId = self:targetParser()
 		if not (str_targetSid and targetId) then
 			return abort("DynQst: new target parsing as nil!") 
@@ -123,9 +124,13 @@ do
 		if self._strTarget ~= str_targetSid then
 			self:changeTarget(targetId, str_targetSid) 
 		end
-
+	
 		for i=1, #self.condlist do
 			self:progress( xr_logic.pick_section_from_condlist(db.actor, self.executor, self.condlist[i]) )
+		end	
+		
+		if self:conder(self) then
+			return self:nextStep()
 		end
 	end
 end
@@ -209,6 +214,10 @@ function DynQuest:setLogic()
 	else
 		return xr_targeter.Offline(self.executor)
 	end
+end
+
+function DynQuest:finalize()
+	log("! DynQuest:finalize")
 end
 
 --**************************************************************************************************************************--
