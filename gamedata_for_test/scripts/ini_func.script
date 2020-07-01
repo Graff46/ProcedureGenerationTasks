@@ -1,0 +1,89 @@
+local func = false
+local patternTbl = {}
+local envModul = false
+local workTbl = {}
+
+
+function funcInsert(mark, fname)
+	local arg = {}
+	
+	function parseArg(strArg)
+		string.gsub(strArg, "[^:]+", function(argument)
+			log("! setPorpuse_"..tostring(argument))
+			table.insert(arg, argument)
+		end)
+		return ""
+	end
+
+	func = false
+
+	fname = string.gsub(fname, "[(](.*)[)]", parseArg)
+	local _tmpFun = envModul[fname]
+	func = _tmpFun
+	
+	if #arg > 0 then
+		func = function(...)
+			return _tmpFun(..., arg)
+		end
+	end
+	if mark == "!" then
+		func = function(...)
+			return not _tmpFun(...)
+		end
+	end
+	table.insert(workTbl, func)
+end
+
+function _parseFunc(fname)
+	string.gsub(fname, "([!=]?)([^!=]+)", funcInsert)
+	return ""
+end
+
+function parseFunc(str, wScript, tblFunc)
+	workTbl = tblFunc
+	envModul = wScript
+	
+	return _parseFunc(str)
+end
+
+function parse(str, wScript)
+	local queue = {}
+	envModul = wScript
+	
+	local tmpStr = "" -- precondition, postcondition, section
+	for part in string.gmatch(str, '[^,]+') do 
+		patternTbl = {{}, {}}
+		
+		workTbl = patternTbl[1]
+		tmpStr = string.gsub(part, "{(.*)}", _parseFunc)
+		workTbl = patternTbl[2]
+		tmpStr = string.gsub(tmpStr, "%%(.*)%%", _parseFunc)
+		
+		workTbl = patternTbl
+		_parseFunc(tmpStr)
+    
+		table.insert(queue, patternTbl)
+	end
+	return queue
+end
+
+function parseStack(ini, section, env)
+	local cnt = ini:line_count(section) - 1
+	local bool, idx, expression 
+	local predicates, postificates, actHandler
+	local queue = {}
+	
+	for i = 0, cnt do
+		patternTbl = {{}, {}}
+		bool, idx, expression = ini:r_line(section, i, '', '')
+		
+		actHandler, predicates, postificates = string.match(expression, "(.+)[,](.*)[,](.*)")
+		
+		parseFunc(predicates, env, patternTbl[1])		
+		parseFunc(postificates, env, patternTbl[2]) 
+		parseFunc(actHandler, env, patternTbl)  
+		
+		table.insert(queue, patternTbl)
+	end
+	return queue
+end

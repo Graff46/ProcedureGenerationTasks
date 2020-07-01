@@ -1,17 +1,70 @@
 --dtask_actions
 local sim = alife()
 
+function noop() end
+
+function storiIdChange(sobj, newSobj)
+	local oldSid = get_object_story_id(sobj.id)
+	unregister_story_object_by_id(sobj.id)
+	return add_story_object(newSobj.id, oldSid)
+end
+
+function offlineTransfer(snpc, sobj)
+	local a = sim:create(sobj:section_name(), sobj.position, sobj.m_level_vertex_id, sobj.m_game_vertex_id, snpc.id)
+	storiIdChange(sobj, a)
+	
+	--sim:release(sobj, true)
+	return a
+end
+
+-- *********************************************************************
+
 function rtrue()
-	log("~ACT2") 
 	return true
 end
 
 function complete(dynQuest)
-	dynQuest:progress('complete')
-	return true
+	return dynQuest:progress('complete')
 end
 
-function def_conder(dynQuest, lgk)
-	return dynQuest.purpose.position:distance_to_sqr(dynQuest.executor.position) < 2 
+function take_obj(dynQuest)
+	if dynQuest.purpose.online and dynQuest.executor.online then
+		local cobj = level.object_by_id(dynQuest.purpose.id)
+		local npc =  level.object_by_id(dynQuest.executor.id)
+		cobj:transfer_item(cobj, npc)
+	else
+		dynQuest.purpose = offlineTransfer(dynQuest.executor, dynQuest.purpose)
+	end
+end 
+
+function setPorpuse(dynQuest, p)
+	
+	dynQuest.purpose = sim:object(get_story_object_id(p[1])) 
 end
 
+function def(dynQuest)
+	return dynQuest.purpose.position:distance_to_sqr(dynQuest.executor.position) < 4 
+end
+
+function transfer(dynQuest)
+	if dynQuest.executor.online and dynQuest.employer.online then
+		local owner = level.object_by_id(dynQuest.executor.id)
+		local npc = level.object_by_id(dynQuest.employer.id)
+		local obj = level.object_by_id(dynQuest.purpose.id)
+		return owner:transfer_item(obj, npc)
+	else
+		dynQuest.purpose = offlineTransfer(dynQuest.employer, dynQuest.purpose)
+	end
+end
+
+function dqStepNext(actor, npc, p)
+	return false-- npc.dynQuest.step >= p[1]
+end
+
+function hasPorpuse(dynQuest)
+	return dynQuest.purpose.parent_id == dynQuest.executor.id
+end
+
+function hasPorpuseEmployer(dynQuest)
+	return dynQuest.purpose.parent_id == dynQuest.employer.id
+end

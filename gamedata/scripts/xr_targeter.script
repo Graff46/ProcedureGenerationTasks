@@ -55,7 +55,6 @@ function go_target:get_path()
 	--self.state = 0
 	state_mgr.set_state (self.object, 'run')
 	
-	log("! Tar_lv_"..tostring(self.sobj.dynQuest.purpose.m_level_vertex_id))
 	self.lastPorpuseLV = self.sobj.dynQuest.purpose.m_level_vertex_id
 	self.lastPorpuseGV = self.sobj.dynQuest.purpose.m_game_vertex_id
 end

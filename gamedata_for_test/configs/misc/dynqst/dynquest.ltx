@@ -1,0 +1,25 @@
+[mynotebookone]
+icon = ui_inGame2_Mesta_evakuatsii
+prior = 106
+storyline = false
+title = htest
+descr = test1
+;target = {=rtrue} setPorpuse(cellnouteone) %=def%, {=def} take_obj %=hasPorpuse%, {=hasPorpuse} setPorpuse(chelone) %=def%, {=def} transfer %=complete%
+stack = mymytest
+
+[mynotebooktwo]
+icon = ui_inGame2_Mesta_evakuatsii
+prior = 106
+storyline = false
+title = htest
+descr = test1
+target = {=dqStepNext(2)} cheltwo|transfer, cellnoutetwo|take_obj 
+condlist = {=dqStepNext(2)} complete 
+
+[mymytest]
+1 = setPorpuse(cellnouteone), =rtrue, =def
+2 = take_obj, =def,  =hasPorpuse
+3 = setPorpuse(chelone), =hasPorpuse,  =def
+4 = transfer, =def, =complete
+
+
